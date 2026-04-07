@@ -7,17 +7,19 @@ public class PlayerStats : ScriptableObject
     public float moveSpeed = 5f;
 
     [Header("채굴")]
-    public float miningDamagePerSecond = 10f;
+    public float miningInterval = 1f;
     public int drillLevel = 0;
 
-    [Header("운반")]
-    public int maxCarryCount = 5;
-    public int currentCarryCount = 0;
+    [Header("철광석 운반 (등)")]
+    public int maxIronOreCarry = 5;
+
+    [Header("수갑 소지 (가슴)")]
+    public int maxHandcuffCarry = 5;
 
     public void UpgradeDrill()
     {
         drillLevel++;
-        miningDamagePerSecond += 10f;
+        miningInterval = Mathf.Max(0.2f, miningInterval - 0.1f);
     }
 
     public void UpgradeMoveSpeed()
@@ -25,13 +27,13 @@ public class PlayerStats : ScriptableObject
         moveSpeed += 1f;
     }
 
-    public void UpgradeCarryCapacity()
+    public void UpgradeIronOreCarry()
     {
-        maxCarryCount += 5;
+        maxIronOreCarry += 3;
     }
 
-    public bool CanCarry()
+    public void UpgradeHandcuffCarry()
     {
-        return currentCarryCount < maxCarryCount;
+        maxHandcuffCarry += 3;
     }
 }

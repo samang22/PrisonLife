@@ -5,11 +5,7 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Header("수감자 설정")]
-    public int maxPrisonerCapacity = 20;
-
-    public int CurrentPrisonerCount { get; private set; }
-
+    // 수감자 수 변경 이벤트 (현재 수, 최대 수)
     public UnityEvent<int, int> onPrisonerCountChanged;
 
     private void Awake()
@@ -23,22 +19,8 @@ public class GameManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    private void Start()
+    public void NotifyPrisonerAdded(int current, int max)
     {
-        CurrentPrisonerCount = 0;
-        onPrisonerCountChanged?.Invoke(CurrentPrisonerCount, maxPrisonerCapacity);
-    }
-
-    public bool TryImprisonPrisoner()
-    {
-        if (CurrentPrisonerCount >= maxPrisonerCapacity)
-        {
-            UIManager.Instance?.ShowMaxIndicator();
-            return false;
-        }
-
-        CurrentPrisonerCount++;
-        onPrisonerCountChanged?.Invoke(CurrentPrisonerCount, maxPrisonerCapacity);
-        return true;
+        onPrisonerCountChanged?.Invoke(current, max);
     }
 }

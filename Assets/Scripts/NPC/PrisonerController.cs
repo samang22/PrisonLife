@@ -1,142 +1,75 @@
+using System.Collections;
 using UnityEngine;
-using UnityEngine.AI;
 
+/// <summary>
+/// 개별 죄수 - 줄을 서서 대기 중인 상태
+/// 수갑이 납품되면 복장 변경 후 감옥으로 이동
+/// </summary>
 public class PrisonerController : MonoBehaviour
 {
-    public enum PrisonerState { Wandering, Fleeing, BeingArrested, Imprisoned }
+    [Header("복장")]
+    public Renderer characterRenderer;
+    public Material civilianMaterial;   // 수갑 전 평상복
+    public Material prisonMaterial;     // 수갑 후 죄수복
 
-    [Header("설정")]
-    public float wanderRadius = 8f;
-    public float fleeSpeed = 4f;
-    public float arrestDistance = 1.5f;
-    public float arrestTime = 1.5f;
-    public int rewardDollars = 20;
+    [Header("이동")]
+    public float moveSpeed = 3f;
 
     [Header("참조")]
     public Animator animator;
 
-    public PrisonerState CurrentState { get; private set; } = PrisonerState.Wandering;
-
-    private NavMeshAgent _agent;
-    private Transform _playerTransform;
-    private float _arrestTimer;
-    private float _wanderTimer;
-    private Vector3 _spawnPosition;
+    public bool IsArrested { get; private set; }
 
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
 
-    private void Awake()
-    {
-        _agent = GetComponent<NavMeshAgent>();
-        _spawnPosition = transform.position;
-    }
-
     private void Start()
     {
-        _playerTransform = FindObjectOfType<PlayerController>()?.transform;
+        // 초기 복장: 평상복
+        if (characterRenderer != null && civilianMaterial != null)
+            characterRenderer.material = civilianMaterial;
     }
 
-    private void Update()
+    /// <summary>
+    /// PrisonerQueue에서 수갑 납품 완료 시 호출
+    /// </summary>
+    public void OnHandcuffDelivered()
     {
-        if (CurrentState == PrisonerState.Imprisoned) return;
+        if (IsArrested) return;
+        IsArrested = true;
 
-        float distToPlayer = _playerTransform != null
-            ? Vector3.Distance(transform.position, _playerTransform.position)
-            : float.MaxValue;
+        // 죄수복으로 변경
+        if (characterRenderer != null && prisonMaterial != null)
+            characterRenderer.material = prisonMaterial;
+    }
 
-        switch (CurrentState)
+    /// <summary>
+    /// 감옥 내 지정 위치로 이동
+    /// </summary>
+    public void MoveToCell(Vector3 targetPosition, System.Action onArrived = null)
+    {
+        StartCoroutine(MoveToCellRoutine(targetPosition, onArrived));
+    }
+
+    private IEnumerator MoveToCellRoutine(Vector3 target, System.Action onArrived)
+    {
+        if (animator != null)
+            animator.SetFloat(SpeedHash, 1f);
+
+        while (Vector3.Distance(transform.position, target) > 0.1f)
         {
-            case PrisonerState.Wandering:
-                HandleWandering(distToPlayer);
-                break;
-            case PrisonerState.Fleeing:
-                HandleFleeing(distToPlayer);
-                break;
-            case PrisonerState.BeingArrested:
-                HandleBeingArrested();
-                break;
+            Vector3 dir = (target - transform.position).normalized;
+            transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.Slerp(transform.rotation,
+                                                  Quaternion.LookRotation(dir),
+                                                  10f * Time.deltaTime);
+            yield return null;
         }
+
+        transform.position = target;
 
         if (animator != null)
-            animator.SetFloat(SpeedHash, _agent.velocity.magnitude);
-    }
+            animator.SetFloat(SpeedHash, 0f);
 
-    private void HandleWandering(float distToPlayer)
-    {
-        if (distToPlayer < 6f)
-        {
-            SetState(PrisonerState.Fleeing);
-            return;
-        }
-
-        _wanderTimer -= Time.deltaTime;
-        if (_wanderTimer <= 0f)
-        {
-            Vector3 randomDir = Random.insideUnitSphere * wanderRadius;
-            randomDir += _spawnPosition;
-            if (NavMesh.SamplePosition(randomDir, out NavMeshHit hit, wanderRadius, NavMesh.AllAreas))
-                _agent.SetDestination(hit.position);
-            _wanderTimer = Random.Range(2f, 5f);
-        }
-    }
-
-    private void HandleFleeing(float distToPlayer)
-    {
-        if (distToPlayer > 10f)
-        {
-            SetState(PrisonerState.Wandering);
-            return;
-        }
-
-        if (distToPlayer <= arrestDistance)
-        {
-            SetState(PrisonerState.BeingArrested);
-            return;
-        }
-
-        // 플레이어 반대 방향으로 도망
-        Vector3 fleeDir = (transform.position - _playerTransform.position).normalized;
-        Vector3 fleeTarget = transform.position + fleeDir * 5f;
-        if (NavMesh.SamplePosition(fleeTarget, out NavMeshHit hit, 5f, NavMesh.AllAreas))
-            _agent.SetDestination(hit.position);
-    }
-
-    private void HandleBeingArrested()
-    {
-        _agent.ResetPath();
-        _agent.velocity = Vector3.zero;
-        transform.LookAt(_playerTransform);
-
-        _arrestTimer += Time.deltaTime;
-        if (_arrestTimer >= arrestTime)
-        {
-            Arrest();
-        }
-    }
-
-    private void Arrest()
-    {
-        if (GameManager.Instance.TryImprisonPrisoner())
-        {
-            CurrencyManager.Instance.AddDollars(rewardDollars);
-            SetState(PrisonerState.Imprisoned);
-            gameObject.SetActive(false);
-        }
-        else
-        {
-            _arrestTimer = 0f;
-            SetState(PrisonerState.Wandering);
-        }
-    }
-
-    private void SetState(PrisonerState newState)
-    {
-        CurrentState = newState;
-        _arrestTimer = 0f;
-
-        _agent.speed = newState == PrisonerState.Fleeing ? fleeSpeed : 2.5f;
-
-        if (newState == PrisonerState.BeingArrested)
-            _agent.ResetPath();
+        onArrived?.Invoke();
     }
 }

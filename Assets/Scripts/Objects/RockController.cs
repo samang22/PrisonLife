@@ -1,17 +1,21 @@
 using UnityEngine;
 
+/// <summary>
+/// 철광석 광맥 - 플레이어가 접근하면 자동 채굴, 철광석을 등에 쌓아줌
+/// </summary>
 public class RockController : MonoBehaviour, IInteractable
 {
-    [Header("설정")]
-    public float maxHealth = 100f;
-    public int dollarsPerHit = 5;
-    public GameObject destroyParticlePrefab;
+    [Header("채굴 설정")]
+    public float miningInterval = 1f;   // 채굴 주기 (초)
     public bool respawn = true;
-    public float respawnTime = 10f;
+    public float respawnTime = 15f;
 
-    private float _currentHealth;
-    private bool _isDead;
+    [Header("이펙트")]
+    public GameObject mineParticlePrefab;
+
+    private bool _isDepleted;
     private float _respawnTimer;
+    private float _miningTimer;
     private MeshRenderer _meshRenderer;
     private Collider _collider;
 
@@ -19,12 +23,11 @@ public class RockController : MonoBehaviour, IInteractable
     {
         _meshRenderer = GetComponentInChildren<MeshRenderer>();
         _collider = GetComponent<Collider>();
-        _currentHealth = maxHealth;
     }
 
     private void Update()
     {
-        if (_isDead && respawn)
+        if (_isDepleted && respawn)
         {
             _respawnTimer -= Time.deltaTime;
             if (_respawnTimer <= 0f)
@@ -32,37 +35,40 @@ public class RockController : MonoBehaviour, IInteractable
         }
     }
 
-    // 플레이어가 트리거 범위 내에 있는 동안 매 프레임 호출
     public void OnInteract(PlayerController player)
     {
-        if (_isDead) return;
-        float damage = player.stats.miningDamagePerSecond * Time.deltaTime;
-        TakeDamage(damage);
+        if (_isDepleted) return;
+        if (!player.CanPickupIronOre()) return;
+
+        _miningTimer += Time.deltaTime;
+
+        // 플레이어 stats의 miningInterval 사용 (업그레이드 반영)
+        float interval = player.stats != null ? player.stats.miningInterval : miningInterval;
+
+        if (_miningTimer >= interval)
+        {
+            _miningTimer = 0f;
+            player.AddIronOre(1);
+
+            if (mineParticlePrefab != null)
+                Instantiate(mineParticlePrefab, transform.position, Quaternion.identity);
+
+            // 채굴 횟수 제한 (5회 채굴 후 고갈)
+            _hitCount++;
+            if (_hitCount >= maxHits)
+                Deplete();
+        }
     }
 
-    public void TakeDamage(float amount)
+    [Header("고갈 설정")]
+    public int maxHits = 5;
+    private int _hitCount;
+
+    private void Deplete()
     {
-        if (_isDead) return;
-
-        _currentHealth -= amount;
-
-        // 체력 비율에 따른 시각적 크기 축소
-        float ratio = Mathf.Clamp01(_currentHealth / maxHealth);
-        transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 1f, ratio);
-
-        CurrencyManager.Instance?.AddDollars(Mathf.RoundToInt(amount * dollarsPerHit * 0.1f));
-
-        if (_currentHealth <= 0f)
-            Die();
-    }
-
-    private void Die()
-    {
-        _isDead = true;
+        _isDepleted = true;
         _respawnTimer = respawnTime;
-
-        if (destroyParticlePrefab != null)
-            Instantiate(destroyParticlePrefab, transform.position, Quaternion.identity);
+        _hitCount = 0;
 
         if (_meshRenderer != null) _meshRenderer.enabled = false;
         if (_collider != null) _collider.enabled = false;
@@ -70,13 +76,9 @@ public class RockController : MonoBehaviour, IInteractable
 
     private void Revive()
     {
-        _isDead = false;
-        _currentHealth = maxHealth;
-        transform.localScale = Vector3.one;
+        _isDepleted = false;
 
         if (_meshRenderer != null) _meshRenderer.enabled = true;
         if (_collider != null) _collider.enabled = true;
     }
-
-    public float GetHealthRatio() => Mathf.Clamp01(_currentHealth / maxHealth);
 }

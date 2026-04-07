@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.AI;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -9,13 +8,26 @@ public class PlayerController : MonoBehaviour
     public VirtualJoystick joystick;
     public Animator animator;
 
+    [Header("아이템 스택 루트")]
+    public Transform ironOreStackRoot;     // 등 위치
+    public Transform handcuffStackRoot;    // 가슴 위치
+
+    [Header("아이템 프리팹")]
+    public GameObject ironOrePrefab;
+    public GameObject handcuffPrefab;
+
+    [Header("스택 간격")]
+    public float stackSpacing = 0.12f;
+
     [Header("설정")]
     public float gravity = -20f;
 
+    // 런타임 인벤토리
+    public int IronOreCount { get; private set; }
+    public int HandcuffCount { get; private set; }
+
     private CharacterController _cc;
     private float _verticalVelocity;
-
-    // 현재 상호작용 중인 대상 (바위, 죄수, 업그레이드 구역)
     private IInteractable _currentInteractable;
 
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
@@ -31,13 +43,60 @@ public class PlayerController : MonoBehaviour
         HandleInteraction();
     }
 
+    // ── 철광석 ──
+    public bool CanPickupIronOre() => IronOreCount < stats.maxIronOreCarry;
+
+    public void AddIronOre(int amount = 1)
+    {
+        IronOreCount = Mathf.Min(IronOreCount + amount, stats.maxIronOreCarry);
+        RefreshStack(ironOreStackRoot, ironOrePrefab, IronOreCount);
+    }
+
+    public bool TakeIronOre(int amount = 1)
+    {
+        if (IronOreCount < amount) return false;
+        IronOreCount -= amount;
+        RefreshStack(ironOreStackRoot, ironOrePrefab, IronOreCount);
+        return true;
+    }
+
+    // ── 수갑 ──
+    public bool CanPickupHandcuff() => HandcuffCount < stats.maxHandcuffCarry;
+
+    public void AddHandcuff(int amount = 1)
+    {
+        HandcuffCount = Mathf.Min(HandcuffCount + amount, stats.maxHandcuffCarry);
+        RefreshStack(handcuffStackRoot, handcuffPrefab, HandcuffCount);
+    }
+
+    public bool TakeHandcuff(int amount = 1)
+    {
+        if (HandcuffCount < amount) return false;
+        HandcuffCount -= amount;
+        RefreshStack(handcuffStackRoot, handcuffPrefab, HandcuffCount);
+        return true;
+    }
+
+    // 스택 시각화: 기존 자식 오브젝트 제거 후 count만큼 재생성
+    private void RefreshStack(Transform root, GameObject prefab, int count)
+    {
+        if (root == null || prefab == null) return;
+
+        foreach (Transform child in root)
+            Destroy(child.gameObject);
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 offset = Vector3.up * i * stackSpacing;
+            Instantiate(prefab, root.position + root.TransformDirection(offset),
+                        root.rotation, root);
+        }
+    }
+
     private void HandleMovement()
     {
         Vector2 input = joystick != null ? joystick.Direction : Vector2.zero;
-
         Vector3 move = new Vector3(input.x, 0f, input.y);
-
-        // 아이소메트릭 카메라 기준 방향 변환 (45도 회전)
         move = Quaternion.Euler(0, 45f, 0) * move;
 
         if (_cc.isGrounded)
@@ -51,7 +110,6 @@ public class PlayerController : MonoBehaviour
         if (animator != null)
             animator.SetFloat(SpeedHash, new Vector3(input.x, 0, input.y).magnitude);
 
-        // 이동 방향으로 캐릭터 회전
         Vector3 flatMove = new Vector3(move.x, 0, move.z);
         if (flatMove.magnitude > 0.1f)
         {
