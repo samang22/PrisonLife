@@ -51,10 +51,7 @@ public class PrisonCell : MonoBehaviour
         }
 
         Vector3 targetPos = GetRandomPositionInArea();
-        prisoner.MoveToCell(targetPos, () =>
-        {
-            prisoner.transform.SetParent(transform);
-        });
+        prisoner.MoveToCell(targetPos);
 
         _prisoners.Add(prisoner);
         _currentCount++;

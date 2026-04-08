@@ -7,9 +7,6 @@ using TMPro;
 /// </summary>
 public class DollarZone : MonoBehaviour, IInteractable
 {
-    [Header("설정")]
-    public float collectInterval = 0.05f;
-
     [Header("UI")]
     public TextMeshPro stackCountText;
 
@@ -20,8 +17,6 @@ public class DollarZone : MonoBehaviour, IInteractable
     public int maxVisualCount = 20;
 
     public int StoredDollars { get; private set; }
-
-    private float _collectTimer;
 
     public void AddDollars(int amount)
     {
@@ -34,12 +29,8 @@ public class DollarZone : MonoBehaviour, IInteractable
     {
         if (StoredDollars <= 0) return;
 
-        _collectTimer += Time.deltaTime;
-        if (_collectTimer < collectInterval) return;
-        _collectTimer = 0f;
-
         StoredDollars--;
-        CurrencyManager.Instance?.AddDollars(1);
+        player.AddDollar(1);
         RefreshUI();
         RefreshVisual();
     }

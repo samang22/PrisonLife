@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4548792195716429824}
   - component: {fileID: 5950939139781367244}
   m_Layer: 0
-  m_Name: DollarZone
+  m_Name: DollarPickupZone
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

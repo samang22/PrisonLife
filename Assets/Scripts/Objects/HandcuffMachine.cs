@@ -11,7 +11,10 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
     public float conversionTime = 3f;
     public int maxQueue = 10;
 
-    [Header("연결")]
+    [Header("연결 - 납품 구역")]
+    public IronOreSubmitRelay ironOreSubmitZone;
+
+    [Header("연결 - 출력 구역")]
     public HandcuffPickupZone pickupZone;
 
     [Header("스택 루트 (날아온 철광석이 쌓이는 위치)")]
@@ -23,6 +26,14 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
     private readonly List<float> _queue = new List<float>();
     private readonly List<GameObject> _stackedOres = new List<GameObject>();
     private float _depositTimer;
+
+    private void Start()
+    {
+        // IronOreSubmitZone이 이 HandcuffMachine을 참조하도록 자동 설정
+        // (Awake 대신 Start 사용 - IronOreSubmitRelay.Awake 이후 실행 보장)
+        if (ironOreSubmitZone != null)
+            ironOreSubmitZone.machine = this;
+    }
 
     private void Update()
     {

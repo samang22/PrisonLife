@@ -87,6 +87,7 @@ public class UpgradeManager : MonoBehaviour
         {
             case UpgradeType.Drill:
                 _player.stats.UpgradeDrill();
+                _player.RefreshTool();
                 break;
             case UpgradeType.MoveSpeed:
                 _player.stats.UpgradeMoveSpeed();

@@ -32,13 +32,12 @@ public class UpgradeZone : MonoBehaviour, IInteractable
     {
         if (UpgradeManager.Instance == null) return;
         if (UpgradeManager.Instance.IsMaxLevel(upgradeType)) return;
-        if (CurrencyManager.Instance == null) return;
 
         _drainTimer += Time.deltaTime;
         if (_drainTimer < drainInterval) return;
         _drainTimer = 0f;
 
-        if (!CurrencyManager.Instance.TrySpendDollars(1)) return;
+        if (!player.TakeDollar(1)) return;
 
         _paid++;
         RefreshUI();

@@ -7,8 +7,12 @@ public class PlayerStats : ScriptableObject
     public float moveSpeed = 5f;
 
     [Header("채굴")]
-    public float miningInterval = 1f;
-    public int drillLevel = 0;
+    public float miningInterval = 0.5f;  // 1단계 채굴 주기
+    public float miningRange = 1.5f;     // 3단계 OverlapSphere 반경
+    public int drillLevel = 0;           // 0=1단계 / 1=2단계 / 2=3단계
+
+    // 단계별 실제 채굴 반경: 1·2단계는 1/3, 3단계는 full
+    public float EffectiveMiningRange => drillLevel >= 2 ? miningRange : miningRange / 3f;
 
     [Header("철광석 운반 (등)")]
     public int maxIronOreCarry = 5;
@@ -18,8 +22,7 @@ public class PlayerStats : ScriptableObject
 
     public void UpgradeDrill()
     {
-        drillLevel++;
-        miningInterval = Mathf.Max(0.2f, miningInterval - 0.1f);
+        drillLevel = Mathf.Min(drillLevel + 1, 2);
     }
 
     public void UpgradeMoveSpeed()
