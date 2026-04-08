@@ -3,14 +3,14 @@ using UnityEngine;
 
 /// <summary>
 /// 개별 죄수 - 줄을 서서 대기 중인 상태
-/// 수갑이 납품되면 복장 변경 후 감옥으로 이동
+/// 수갑 납품 → 복장 변경 → 감옥 이동 → WorkerController로 전환
 /// </summary>
 public class PrisonerController : MonoBehaviour
 {
-    [Header("복장")]
-    public Renderer characterRenderer;
-    public Material civilianMaterial;   // 수갑 전 평상복
-    public Material prisonMaterial;     // 수갑 후 죄수복
+    [Header("복장 교체")]
+    public CharacterEquipment equipment;
+    public GameObject civilianCostumePrefab;
+    public GameObject prisonCostumePrefab;
 
     [Header("이동")]
     public float moveSpeed = 3f;
@@ -25,8 +25,13 @@ public class PrisonerController : MonoBehaviour
     private void Start()
     {
         // 초기 복장: 평상복
-        if (characterRenderer != null && civilianMaterial != null)
-            characterRenderer.material = civilianMaterial;
+        if (equipment != null && civilianCostumePrefab != null)
+            equipment.Equip("Costume", civilianCostumePrefab);
+
+        // WorkerController는 수감 전까지 비활성
+        WorkerController worker = GetComponent<WorkerController>();
+        if (worker != null)
+            worker.enabled = false;
     }
 
     /// <summary>
@@ -37,13 +42,13 @@ public class PrisonerController : MonoBehaviour
         if (IsArrested) return;
         IsArrested = true;
 
-        // 죄수복으로 변경
-        if (characterRenderer != null && prisonMaterial != null)
-            characterRenderer.material = prisonMaterial;
+        // 죄수복으로 교체
+        if (equipment != null && prisonCostumePrefab != null)
+            equipment.Equip("Costume", prisonCostumePrefab);
     }
 
     /// <summary>
-    /// 감옥 내 지정 위치로 이동
+    /// 감옥 내 지정 위치로 이동. 도착 시 WorkerController로 전환.
     /// </summary>
     public void MoveToCell(Vector3 targetPosition, System.Action onArrived = null)
     {
@@ -70,6 +75,18 @@ public class PrisonerController : MonoBehaviour
         if (animator != null)
             animator.SetFloat(SpeedHash, 0f);
 
+        // 도착 시 상태 전환: PrisonerController OFF, WorkerController ON
+        TransitionToWorker();
+
         onArrived?.Invoke();
+    }
+
+    private void TransitionToWorker()
+    {
+        WorkerController worker = GetComponent<WorkerController>();
+        if (worker != null)
+            worker.enabled = true;
+
+        this.enabled = false;
     }
 }

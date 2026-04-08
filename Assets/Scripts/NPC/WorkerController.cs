@@ -1,21 +1,30 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// 수감된 죄수 - 감옥 안에서 자동으로 철광석을 생산
-/// 속도는 플레이어 초기 채굴 속도보다 조금 느린 수준
+/// 수감된 죄수 - 일정 주기로 철광석 프리팹을 생성하여 HandcuffMachine 스택 위치로 날려 보냄
 /// </summary>
 public class WorkerController : MonoBehaviour
 {
     [Header("생산 설정")]
-    public float productionInterval = 1.5f;  // 플레이어 기본 1초보다 느린 1.5초
+    public float productionInterval = 1.5f;
 
     [Header("연결")]
-    public HandcuffPickupZone outputZone;    // 생산한 자원을 보낼 구역 (선택)
+    public HandcuffMachine targetMachine;
+
+    [Header("프리팹")]
+    public GameObject ironOrePrefab;
+
+    [Header("이동 설정")]
+    public float flySpeed = 5f;
+    public float arcHeight = 1.5f;
 
     private float _timer;
 
     private void Update()
     {
+        if (targetMachine == null || ironOrePrefab == null) return;
+
         _timer += Time.deltaTime;
         if (_timer >= productionInterval)
         {
@@ -26,11 +35,38 @@ public class WorkerController : MonoBehaviour
 
     private void ProduceResource()
     {
-        // 수감된 죄수가 자동으로 철광석 1개 생산 → 제작대 인근 구역에 공급
-        // outputZone이 없으면 CurrencyManager로 직접 소량 지급 (설계에 따라 조정)
-        if (outputZone != null)
-            outputZone.AddHandcuff(0); // 필요 시 철광석 공급 로직으로 교체
-        else
-            CurrencyManager.Instance?.AddDollars(1);
+        if (targetMachine.QueueCount >= targetMachine.maxQueue) return;
+
+        Vector3 spawnPos = transform.position + Vector3.up * 1f;
+        GameObject ore = Instantiate(ironOrePrefab, spawnPos, Quaternion.identity);
+        StartCoroutine(FlyToMachine(ore));
+    }
+
+    private IEnumerator FlyToMachine(GameObject ore)
+    {
+        if (targetMachine.StackRoot == null)
+        {
+            Destroy(ore);
+            yield break;
+        }
+
+        Vector3 start = ore.transform.position;
+        Vector3 end = targetMachine.StackRoot.position;
+        float distance = Vector3.Distance(start, end);
+        float duration = Mathf.Max(0.1f, distance / flySpeed);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (ore == null) yield break;
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            Vector3 linear = Vector3.Lerp(start, end, t);
+            ore.transform.position = linear + Vector3.up * (Mathf.Sin(t * Mathf.PI) * arcHeight);
+            yield return null;
+        }
+
+        if (ore == null) yield break;
+        targetMachine.ReceiveIronOre(ore);
     }
 }

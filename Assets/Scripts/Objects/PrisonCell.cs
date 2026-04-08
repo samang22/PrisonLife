@@ -1,10 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
 /// <summary>
-/// 감옥 수용 구역 - 수감된 죄수가 동선을 따라 이동 후 정지
+/// 감옥 수용 구역 - 콜라이더 영역 안에 죄수가 위치하면 됨
 /// 최대 수용 시 흔들림 연출
 /// </summary>
 public class PrisonCell : MonoBehaviour
@@ -15,22 +14,18 @@ public class PrisonCell : MonoBehaviour
     public int baseCapacity = 5;
     public int capacityPerExpansion = 5;
 
-    [Header("수감 위치 (순서대로)")]
-    public Transform[] cellSlots;
-
-    [Header("UI")]
-    public TextMeshPro capacityText;
-
     [Header("흔들림 연출")]
     public float shakeAmplitude = 0.08f;
     public float shakeDuration = 0.6f;
 
     private int _maxCapacity;
-    private int _currentCount;
     private int _expansionLevel;
+    private int _currentCount;
+
+    private BoxCollider _area;
+    private bool _isShaking;
 
     private readonly List<PrisonerController> _prisoners = new List<PrisonerController>();
-    private bool _isShaking;
 
     private void Awake()
     {
@@ -40,12 +35,9 @@ public class PrisonCell : MonoBehaviour
             return;
         }
         Instance = this;
-        _maxCapacity = baseCapacity;
-    }
 
-    private void Start()
-    {
-        RefreshUI();
+        _maxCapacity = baseCapacity;
+        _area = GetComponent<BoxCollider>();
     }
 
     public void ReceivePrisoner(PrisonerController prisoner)
@@ -58,36 +50,36 @@ public class PrisonCell : MonoBehaviour
             return;
         }
 
-        Transform slot = cellSlots != null && _currentCount < cellSlots.Length
-            ? cellSlots[_currentCount]
-            : null;
-
-        if (slot != null)
+        Vector3 targetPos = GetRandomPositionInArea();
+        prisoner.MoveToCell(targetPos, () =>
         {
-            prisoner.MoveToCell(slot.position, () =>
-            {
-                prisoner.transform.SetParent(transform);
-            });
-        }
+            prisoner.transform.SetParent(transform);
+        });
 
         _prisoners.Add(prisoner);
         _currentCount++;
 
         GameManager.Instance?.NotifyPrisonerAdded(_currentCount, _maxCapacity);
-        RefreshUI();
     }
 
     public void Expand()
     {
         _expansionLevel++;
         _maxCapacity = baseCapacity + _expansionLevel * capacityPerExpansion;
-        RefreshUI();
     }
 
-    private void RefreshUI()
+    // 콜라이더 영역 내 랜덤 위치 반환
+    private Vector3 GetRandomPositionInArea()
     {
-        if (capacityText != null)
-            capacityText.text = $"{_currentCount}/{_maxCapacity}";
+        if (_area == null)
+            return transform.position;
+
+        Bounds bounds = _area.bounds;
+        return new Vector3(
+            Random.Range(bounds.min.x, bounds.max.x),
+            bounds.min.y,
+            Random.Range(bounds.min.z, bounds.max.z)
+        );
     }
 
     private IEnumerator ShakeRoutine()

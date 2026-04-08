@@ -20,6 +20,11 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
     private void Start()
     {
         _canvas = GetComponentInParent<Canvas>();
+        if (_canvas == null)
+        {
+            Debug.LogError("VirtualJoystick: 부모 Canvas를 찾을 수 없습니다.");
+            return;
+        }
         _camera = _canvas.renderMode == RenderMode.ScreenSpaceCamera ? _canvas.worldCamera : null;
         SetHandlePosition(Vector2.zero);
     }
