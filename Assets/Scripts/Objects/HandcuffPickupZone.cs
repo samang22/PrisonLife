@@ -24,6 +24,15 @@ public class HandcuffPickupZone : MonoBehaviour, IInteractable
         RefreshVisual();
     }
 
+    // OfficerController에서 호출 - 실제 가져간 수량 반환
+    public int TakeHandcuff(int amount = 1)
+    {
+        int taken = Mathf.Min(amount, StoredCount);
+        StoredCount -= taken;
+        RefreshVisual();
+        return taken;
+    }
+
     public void OnInteract(PlayerController player)
     {
         if (StoredCount <= 0) return;

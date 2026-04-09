@@ -85,7 +85,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2, y: 1, z: 1.2}
+  m_Size: {x: 3, y: 1, z: 2}
   m_Center: {x: 0, y: 0.5, z: 0}
 --- !u!114 &2000000000000000004
 MonoBehaviour:
@@ -103,7 +103,7 @@ MonoBehaviour:
   handcuffStackRoot: {fileID: 5957780723936709327}
   handcuffVisualPrefab: {fileID: 1187556030842128150, guid: c48977b7cf0ebc64080f226996d7d287, type: 3}
   stackSpacing: 0.08
-  maxVisualCount: 20
+  maxVisualCount: 300
 --- !u!1001 &3962375063026875293
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -33,6 +33,7 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
 
     [Header("설정")]
     public int rewardPerPrisoner = 20;
+    public int handcuffsPerPrisoner = 4;
     public float deliveryInterval = 0.25f;
     public float arrestInterval = 0.5f;
 
@@ -158,7 +159,7 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
     // ── 맨 앞 죄수 체포 ──
     private void TryArrestNext()
     {
-        if (_storedHandcuffs <= 0) return;
+        if (_storedHandcuffs < handcuffsPerPrisoner) return;
         if (_waitingPrisoners.Count == 0) return;
 
         // PrisonCell이 포화 상태면 체포 중단 (수갑 소모 없음)
@@ -171,7 +172,7 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
             return;
         }
 
-        _storedHandcuffs--;
+        _storedHandcuffs -= handcuffsPerPrisoner;
         handcuffSubmitZone?.RefreshVisual(_storedHandcuffs);
         prisoner.OnHandcuffDelivered();
         _waitingPrisoners.RemoveAt(0);
@@ -191,6 +192,13 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         {
             prisonCell?.ReceivePrisoner(prisoner);
         }
+    }
+
+    // OfficerController에서 호출 - 플레이어 없이 직접 수갑 납품
+    public void SubmitHandcuffByOfficer(int amount = 1)
+    {
+        _storedHandcuffs += amount;
+        handcuffSubmitZone?.RefreshVisual(_storedHandcuffs);
     }
 
     public int StoredHandcuffs => _storedHandcuffs;

@@ -70,8 +70,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   baseCapacity: 5
   capacityPerExpansion: 5
+  expansionPerLevel: {x: 2, y: 0, z: 2}
+  floorVisual: {fileID: 0}
+  ironOreSubmitZone: {fileID: 0}
+  workerIronOrePrefab: {fileID: 0}
+  groundY: 0
   shakeAmplitude: 0.08
   shakeDuration: 0.6
+  shakeFrequency: 30
+  shakeTarget: {fileID: 1883149656764556761}
 --- !u!1 &7949673458711849963
 GameObject:
   m_ObjectHideFlags: 0

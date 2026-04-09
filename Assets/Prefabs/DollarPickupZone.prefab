@@ -54,7 +54,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.8, y: 10, z: 1}
+  m_Size: {x: 3, y: 10, z: 2}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &5950939139781367244
 MonoBehaviour:
@@ -68,12 +68,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a3b9b86991c59b489be0db2254b684a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  collectInterval: 0.05
   stackCountText: {fileID: 0}
   dollarStackRoot: {fileID: 6638583651558222104}
   dollarVisualPrefab: {fileID: 7180591921170553592, guid: be9b1f3b020897542bd3904fbe40a3c9, type: 3}
   stackSpacing: 0.06
-  maxVisualCount: 20
+  maxVisualCount: 300
 --- !u!1 &5161879398035181364
 GameObject:
   m_ObjectHideFlags: 0

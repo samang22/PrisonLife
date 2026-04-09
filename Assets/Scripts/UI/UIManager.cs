@@ -51,7 +51,7 @@ public class UIManager : MonoBehaviour
             GameManager.Instance.onPrisonerCountChanged.RemoveListener(UpdatePrisonerCountUI);
     }
 
-    private void UpdateDollarsUI(int amount)
+    public void UpdateDollarsUI(int amount)
     {
         if (dollarsText != null)
             dollarsText.text = $"${amount}";

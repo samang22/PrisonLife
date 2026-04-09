@@ -20,14 +20,11 @@ public class PrisonerController : MonoBehaviour
 
     public bool IsArrested { get; private set; }
 
-    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int VertHash = Animator.StringToHash("Vert");
 
     private void Start()
     {
-        // 초기 복장: 평상복
-        if (equipment != null && civilianCostumePrefab != null)
-            equipment.Equip("Costume", civilianCostumePrefab);
-
+        // 초기 복장은 CharacterEquipment.defaultEquipment의 "OutWear" 슬롯이 처리
         // WorkerController는 수감 전까지 비활성
         WorkerController worker = GetComponent<WorkerController>();
         if (worker != null)
@@ -42,9 +39,9 @@ public class PrisonerController : MonoBehaviour
         if (IsArrested) return;
         IsArrested = true;
 
-        // 죄수복으로 교체
+        // 죄수복으로 교체 (defaultEquipment의 "OutWear" 슬롯을 덮어씀)
         if (equipment != null && prisonCostumePrefab != null)
-            equipment.Equip("Costume", prisonCostumePrefab);
+            equipment.Equip("OutWear", prisonCostumePrefab);
     }
 
     /// <summary>
@@ -58,7 +55,7 @@ public class PrisonerController : MonoBehaviour
     private IEnumerator MoveToCellRoutine(Vector3 target, System.Action onArrived)
     {
         if (animator != null)
-            animator.SetFloat(SpeedHash, 1f);
+            animator.SetFloat(VertHash, 1f);
 
         while (Vector3.Distance(transform.position, target) > 0.1f)
         {
@@ -73,20 +70,18 @@ public class PrisonerController : MonoBehaviour
         transform.position = target;
 
         if (animator != null)
-            animator.SetFloat(SpeedHash, 0f);
-
-        // 도착 시 상태 전환: PrisonerController OFF, WorkerController ON
-        TransitionToWorker();
+            animator.SetFloat(VertHash, 0f);
 
         onArrived?.Invoke();
+
+        // 도착 시 상태 전환: PrisonerController OFF (onArrived 이후 비활성화)
+        TransitionToWorker();
     }
 
     private void TransitionToWorker()
     {
-        WorkerController worker = GetComponent<WorkerController>();
-        if (worker != null)
-            worker.enabled = true;
-
+        // WorkerController 활성화는 PrisonCell.HireWorkers()에서 명시적으로 처리
+        // 여기서는 PrisonerController만 비활성화하여 대기 상태로 전환
         this.enabled = false;
     }
 }

@@ -44,11 +44,12 @@ public class PlayerController : MonoBehaviour
     private int _depositsInRange;
     private float _miningTimer;
 
-    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int VertHash = Animator.StringToHash("Vert");
 
     private void Awake()
     {
         _cc = GetComponent<CharacterController>();
+        stats?.RuntimeReset();
     }
 
     private void Start()
@@ -148,6 +149,7 @@ public class PlayerController : MonoBehaviour
     {
         DollarCount += amount;
         RefreshStack(dollarStackRoot, dollarPrefab, DollarCount);
+        UIManager.Instance?.UpdateDollarsUI(DollarCount);
     }
 
     public bool TakeDollar(int amount = 1)
@@ -155,6 +157,7 @@ public class PlayerController : MonoBehaviour
         if (DollarCount < amount) return false;
         DollarCount -= amount;
         RefreshStack(dollarStackRoot, dollarPrefab, DollarCount);
+        UIManager.Instance?.UpdateDollarsUI(DollarCount);
         return true;
     }
 
@@ -188,8 +191,10 @@ public class PlayerController : MonoBehaviour
         move.y = _verticalVelocity;
         _cc.Move(move * stats.moveSpeed * Time.deltaTime);
 
+        float mag = 0f;
         if (animator != null)
-            animator.SetFloat(SpeedHash, new Vector3(input.x, 0, input.y).magnitude);
+            mag = new Vector3(input.x, 0, input.y).magnitude;
+            animator.SetFloat(VertHash, mag > 0.1f ? 1f : 0f);
 
         Vector3 flatMove = new Vector3(move.x, 0, move.z);
         if (flatMove.magnitude > 0.1f)
@@ -219,17 +224,34 @@ public class PlayerController : MonoBehaviour
         if (_miningTimer < stats.miningInterval) return;
         _miningTimer = 0f;
 
+        // 1단계: 범위 내 가장 가까운 Deposit 1개 채굴
+        RockController nearest = GetNearestDeposit();
+        nearest?.Mine(this);
+    }
+
+    // 채굴 범위 중심에서 가장 가까운 활성 RockController 반환
+    private RockController GetNearestDeposit()
+    {
         Vector3 center = transform.position + transform.forward * 1f;
         Collider[] hits = Physics.OverlapSphere(center, stats.EffectiveMiningRange, miningLayerMask);
+
+        RockController nearest = null;
+        float nearestDist = float.MaxValue;
+
         foreach (Collider hit in hits)
         {
             RockController rock = hit.GetComponent<RockController>();
-            if (rock != null)
+            if (rock == null) continue;
+
+            float dist = Vector3.Distance(center, hit.transform.position);
+            if (dist < nearestDist)
             {
-                rock.Mine(this);
-                break;  // 1단계: 첫 번째 하나만
+                nearestDist = dist;
+                nearest = rock;
             }
         }
+
+        return nearest;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -242,10 +264,11 @@ public class PlayerController : MonoBehaviour
 
             if (stats == null) return;
 
-            // 2단계(drillLevel 1): 닿은 Deposit 즉시 1개 채굴
+            // 2단계(drillLevel 1): 범위 내 가장 가까운 Deposit 즉시 1개 채굴
             if (stats.drillLevel == 1)
             {
-                rock.Mine(this);
+                RockController nearest = GetNearestDeposit();
+                nearest?.Mine(this);
             }
             // 3단계(drillLevel 2): 범위 내 모든 Deposit 즉시 채굴
             else if (stats.drillLevel == 2)

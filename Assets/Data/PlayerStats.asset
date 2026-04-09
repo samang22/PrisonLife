@@ -12,8 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d8a78aeee7479e49a4166a0b291332c, type: 3}
   m_Name: PlayerStats
   m_EditorClassIdentifier: 
+  defaultMoveSpeed: 5
+  defaultMiningInterval: 0.5
+  defaultMiningRange: 1.5
+  defaultDrillLevel: 0
+  defaultMaxIronOreCarry: 10
+  defaultMaxHandcuffCarry: 10
   moveSpeed: 5
-  miningInterval: 1
+  miningInterval: 0.5
+  miningRange: 1.5
   drillLevel: 0
   maxIronOreCarry: 5
   maxHandcuffCarry: 5

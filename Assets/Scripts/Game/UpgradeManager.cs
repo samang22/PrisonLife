@@ -7,7 +7,9 @@ public enum UpgradeType
     MoveSpeed,
     IronOreCarry,
     HandcuffCarry,
-    PrisonExpansion
+    PrisonExpansion,
+    HireWorker,
+    HireOfficer
 }
 
 [System.Serializable]
@@ -29,6 +31,12 @@ public class UpgradeManager : MonoBehaviour
 
     [Header("업그레이드 목록")]
     public List<UpgradeData> upgrades = new List<UpgradeData>();
+
+    [Header("Officer 고용")]
+    public GameObject       officerPrefab;
+    public Transform        officerSpawnPoint;
+    public HandcuffPickupZone  officerPickupZone;
+    public HandcuffSubmitRelay officerHandcuffSubmitZone;
 
     private PlayerController _player;
 
@@ -55,11 +63,13 @@ public class UpgradeManager : MonoBehaviour
 
         upgrades = new List<UpgradeData>
         {
-            new UpgradeData { upgradeName = "드릴 업그레이드",     upgradeType = UpgradeType.Drill,          baseCost = 50, maxLevel = 5 },
-            new UpgradeData { upgradeName = "이동속도 업그레이드", upgradeType = UpgradeType.MoveSpeed,      baseCost = 40, maxLevel = 5 },
-            new UpgradeData { upgradeName = "운반량 업그레이드",   upgradeType = UpgradeType.IronOreCarry,   baseCost = 60, maxLevel = 5 },
-            new UpgradeData { upgradeName = "수갑 소지 업그레이드",upgradeType = UpgradeType.HandcuffCarry,  baseCost = 60, maxLevel = 5 },
-            new UpgradeData { upgradeName = "감옥 확장",           upgradeType = UpgradeType.PrisonExpansion,baseCost = 100, maxLevel = 10 }
+            new UpgradeData { upgradeName = "Mining Upgrade",        upgradeType = UpgradeType.Drill,           baseCost = 50,  maxLevel = 5 },
+            new UpgradeData { upgradeName = "Speed Upgrade",         upgradeType = UpgradeType.MoveSpeed,       baseCost = 40,  maxLevel = 5 },
+            new UpgradeData { upgradeName = "Iron Capacity Upgrade", upgradeType = UpgradeType.IronOreCarry,    baseCost = 60,  maxLevel = 5 },
+            new UpgradeData { upgradeName = "Handcuff Upgrade",      upgradeType = UpgradeType.HandcuffCarry,   baseCost = 60,  maxLevel = 5 },
+            new UpgradeData { upgradeName = "PrisonCell Expand",     upgradeType = UpgradeType.PrisonExpansion, baseCost = 20,  maxLevel = 10 },
+            new UpgradeData { upgradeName = "Hire Workers",  upgradeType = UpgradeType.HireWorker,  baseCost = 50,  maxLevel = 9999 },
+            new UpgradeData { upgradeName = "Hire Officer",  upgradeType = UpgradeType.HireOfficer, baseCost = 100, maxLevel = 1 }
         };
     }
 
@@ -68,13 +78,53 @@ public class UpgradeManager : MonoBehaviour
 
     public int GetCost(UpgradeType type) => GetData(type)?.CurrentCost ?? 0;
 
-    public bool IsMaxLevel(UpgradeType type) => GetData(type)?.IsMaxLevel ?? true;
+    public bool IsMaxLevel(UpgradeType type)
+    {
+        // HireWorker: 감옥에 미고용 죄수가 없으면 MAX 표시
+        if (type == UpgradeType.HireWorker)
+            return PrisonCell.Instance == null || !PrisonCell.Instance.HasUnhiredPrisoners;
+
+        return GetData(type)?.IsMaxLevel ?? true;
+    }
 
     /// <summary>
     /// UpgradeZone에서 1원씩 납부 완료 후 호출 - 달러 차감 없이 업그레이드만 적용
     /// </summary>
     public void ApplyUpgrade(UpgradeType type)
     {
+        // HireWorker: currentLevel 증가 없이 즉시 고용 처리
+        if (type == UpgradeType.HireWorker)
+        {
+            PrisonCell.Instance?.HireWorkers(3);
+            return;
+        }
+
+        // HireOfficer: Officer 프리팹 스폰 (1회 한정, currentLevel 증가로 maxLevel 도달)
+        if (type == UpgradeType.HireOfficer)
+        {
+            UpgradeData officerData = GetData(UpgradeType.HireOfficer);
+            if (officerData != null) officerData.currentLevel++;
+
+            if (officerPrefab != null)
+            {
+                Vector3    spawnPos = officerSpawnPoint != null ? officerSpawnPoint.position : Vector3.zero;
+                Quaternion spawnRot = officerSpawnPoint != null ? officerSpawnPoint.rotation : Quaternion.identity;
+
+                GameObject obj     = Instantiate(officerPrefab, spawnPos, spawnRot);
+                OfficerController officer = obj.GetComponent<OfficerController>();
+                if (officer != null)
+                {
+                    officer.pickupZone         = officerPickupZone;
+                    officer.handcuffSubmitZone = officerHandcuffSubmitZone;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[UpgradeManager] officerPrefab이 설정되지 않았습니다.");
+            }
+            return;
+        }
+
         UpgradeData data = GetData(type);
         if (data == null || data.IsMaxLevel) return;
 

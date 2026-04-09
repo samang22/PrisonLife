@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 879199285305991822}
-  - component: {fileID: 9167245382884028640}
   - component: {fileID: 8200948962452820139}
   - component: {fileID: 4310070130271270168}
   m_Layer: 0
@@ -35,27 +34,6 @@ Transform:
   - {fileID: 2257022987153839013}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &9167245382884028640
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5698055633233596609}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.1, y: 0.5, z: 0.1}
-  m_Center: {x: 0, y: -0.3, z: 0}
 --- !u!65 &8200948962452820139
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -89,11 +67,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e3f7e06c0a6bdd242bc23dfa6ed4e942, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  miningInterval: 1
   respawn: 1
   respawnTime: 15
-  mineParticlePrefab: {fileID: 0}
-  maxHits: 5
+  mineParticlePrefab: {fileID: 6557717566896455631, guid: eeaad410de59e8c408e89f8f1260dece, type: 3}
 --- !u!1001 &2514790947386080302
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -102,9 +78,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 879199285305991822}
     m_Modifications:
+    - target: {fileID: -349497575753484734, guid: aaf11a042e9932a40bb90b9b171a128e, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3962899205002032433, guid: aaf11a042e9932a40bb90b9b171a128e, type: 3}
       propertyPath: m_Name
       value: drink_001
+      objectReference: {fileID: 0}
+    - target: {fileID: 3962899205002032433, guid: aaf11a042e9932a40bb90b9b171a128e, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4446420041510072203, guid: aaf11a042e9932a40bb90b9b171a128e, type: 3}
       propertyPath: m_LocalPosition.x

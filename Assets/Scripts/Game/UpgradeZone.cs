@@ -16,7 +16,8 @@ public class UpgradeZone : MonoBehaviour, IInteractable
     public GameObject maxLevelIndicator;
 
     [Header("설정")]
-    public float drainInterval = 0.05f;
+    public float drainInterval  = 0.05f;
+    public bool  disableOnMax   = false;   // true면 MAX 도달 시 이 GameObject 비활성화
 
     private float _drainTimer;
     private int _paid;
@@ -26,6 +27,13 @@ public class UpgradeZone : MonoBehaviour, IInteractable
     {
         RefreshCost();
         RefreshUI();
+    }
+
+    private void Update()
+    {
+        // HireWorker는 감옥 상태가 실시간으로 바뀌므로 매 프레임 UI 갱신
+        if (upgradeType == UpgradeType.HireWorker)
+            RefreshUI();
     }
 
     public void OnInteract(PlayerController player)
@@ -60,6 +68,34 @@ public class UpgradeZone : MonoBehaviour, IInteractable
 
     private void RefreshUI()
     {
+        // HireWorker: 감옥에 죄수가 아예 없으면 비용/MAX 표시 모두 공란
+        if (upgradeType == UpgradeType.HireWorker)
+        {
+            bool noPrisoners = PrisonCell.Instance == null || PrisonCell.Instance.CurrentCount == 0;
+            bool allHired    = !noPrisoners && (PrisonCell.Instance == null || !PrisonCell.Instance.HasUnhiredPrisoners);
+
+            if (remainingCostText != null)
+            {
+                if (noPrisoners)
+                    remainingCostText.text = "";
+                else if (allHired)
+                    remainingCostText.text = "MAX";
+                else
+                    remainingCostText.text = $"${Mathf.Max(0, _currentLevelCost - _paid)}";
+            }
+
+            if (upgradeNameText != null)
+            {
+                UpgradeData data = UpgradeManager.Instance?.GetData(upgradeType);
+                if (data != null) upgradeNameText.text = data.upgradeName;
+            }
+
+            if (maxLevelIndicator != null)
+                maxLevelIndicator.SetActive(allHired);
+
+            return;
+        }
+
         bool isMax = UpgradeManager.Instance?.IsMaxLevel(upgradeType) ?? false;
         int remaining = Mathf.Max(0, _currentLevelCost - _paid);
 
@@ -75,6 +111,9 @@ public class UpgradeZone : MonoBehaviour, IInteractable
 
         if (maxLevelIndicator != null)
             maxLevelIndicator.SetActive(isMax);
+
+        if (isMax && disableOnMax)
+            gameObject.SetActive(false);
     }
 
     // 플레이어가 구역을 벗어나면 진행 초기화 없이 유지 (재진입 시 이어서 납부)

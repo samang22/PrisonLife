@@ -46,6 +46,20 @@ public class RockController : MonoBehaviour
         Deplete();
     }
 
+    // WorkerController에서 호출 - 채굴 성공 여부 반환
+    public bool MineByWorker()
+    {
+        if (_isDepleted) return false;
+
+        if (mineParticlePrefab != null)
+            Instantiate(mineParticlePrefab, transform.position, Quaternion.identity);
+
+        Deplete();
+        return true;
+    }
+
+    public bool IsAvailable => !_isDepleted;
+
     private void Deplete()
     {
         _isDepleted = true;

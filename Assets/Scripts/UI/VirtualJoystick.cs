@@ -15,6 +15,7 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
 
     private Canvas _canvas;
     private Camera _camera;
+    private RectTransform _canvasRect;
     private Vector2 _inputVector;
 
     private void Start()
@@ -25,17 +26,34 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
             Debug.LogError("VirtualJoystick: 부모 Canvas를 찾을 수 없습니다.");
             return;
         }
+        _canvasRect = _canvas.GetComponent<RectTransform>();
         _camera = _canvas.renderMode == RenderMode.ScreenSpaceCamera ? _canvas.worldCamera : null;
+
+        if (background != null) background.gameObject.SetActive(false);
         SetHandlePosition(Vector2.zero);
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (background != null)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRect,
+                eventData.position,
+                _camera,
+                out Vector2 localPoint
+            );
+            background.anchoredPosition = localPoint;
+            background.gameObject.SetActive(true);
+        }
+
         OnDrag(eventData);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
+        if (background == null) return;
+
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             background,
             eventData.position,
@@ -58,6 +76,7 @@ public class VirtualJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler,
         _inputVector = Vector2.zero;
         Direction = Vector2.zero;
         SetHandlePosition(Vector2.zero);
+        if (background != null) background.gameObject.SetActive(false);
     }
 
     private void SetHandlePosition(Vector2 input)
