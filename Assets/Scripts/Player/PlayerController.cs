@@ -161,19 +161,30 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    // 스택 시각화: 기존 자식 오브젝트 제거 후 count만큼 재생성
+    // 스택 시각화: 오브젝트 풀링 — 초과분 비활성화, 부족분만 신규 생성
     private void RefreshStack(Transform root, GameObject prefab, int count)
     {
         if (root == null || prefab == null) return;
 
-        foreach (Transform child in root)
-            Destroy(child.gameObject);
+        int current = root.childCount;
+
+        for (int i = count; i < current; i++)
+            root.GetChild(i).gameObject.SetActive(false);
 
         for (int i = 0; i < count; i++)
         {
-            Vector3 offset = Vector3.up * i * stackSpacing;
-            Instantiate(prefab, root.position + root.TransformDirection(offset),
-                        root.rotation, root);
+            GameObject obj;
+            if (i < current)
+            {
+                obj = root.GetChild(i).gameObject;
+                obj.SetActive(true);
+            }
+            else
+            {
+                obj = Instantiate(prefab, root);
+            }
+            obj.transform.localPosition = Vector3.up * i * stackSpacing;
+            obj.transform.localRotation = Quaternion.identity;
         }
     }
 
