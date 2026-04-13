@@ -41,6 +41,8 @@ public class PrisonCell : MonoBehaviour
     private BoxCollider _area;
     private bool _isShaking;
 
+    private Vector3 _shakeBaseLocalPosition;
+
     private readonly List<PrisonerController> _prisoners = new List<PrisonerController>();
 
     private void Awake()
@@ -60,6 +62,9 @@ public class PrisonCell : MonoBehaviour
 
         if (floorVisual != null)
             _baseFloorScale = floorVisual.localScale;
+
+        Transform shakeT = shakeTarget != null ? shakeTarget : transform;
+        _shakeBaseLocalPosition = shakeT.localPosition;
     }
 
     public void ReceivePrisoner(PrisonerController prisoner)
@@ -188,5 +193,31 @@ public class PrisonCell : MonoBehaviour
             }
             return false;
         }
+    }
+
+    /// <summary>게임 리셋 — 수갑·확장·흔들림·죄수 제거</summary>
+    public void ResetToInitialState()
+    {
+        StopAllCoroutines();
+        _isShaking = false;
+
+        Transform shakeT = shakeTarget != null ? shakeTarget : transform;
+        shakeT.localPosition = _shakeBaseLocalPosition;
+
+        foreach (PrisonerController p in _prisoners)
+        {
+            if (p != null) Destroy(p.gameObject);
+        }
+        _prisoners.Clear();
+        _currentCount = 0;
+        _expansionLevel = 0;
+        _maxCapacity = baseCapacity;
+
+        if (_area != null)
+            _area.size = _baseColliderSize;
+        if (floorVisual != null)
+            floorVisual.localScale = _baseFloorScale;
+
+        GameManager.Instance?.NotifyPrisonerAdded(0, _maxCapacity);
     }
 }

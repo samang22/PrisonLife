@@ -18,6 +18,14 @@ public class DollarZone : MonoBehaviour, IInteractable
 
     public int StoredDollars { get; private set; }
 
+    /// <summary>게임 리셋 — 구역에 쌓인 달러 제거</summary>
+    public void ClearStored()
+    {
+        StoredDollars = 0;
+        RefreshUI();
+        RefreshVisual();
+    }
+
     public void AddDollars(int amount)
     {
         StoredDollars += amount;

@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   respawn: 1
   respawnTime: 15
-  mineParticlePrefab: {fileID: 6557717566896455631, guid: eeaad410de59e8c408e89f8f1260dece, type: 3}
+  mineParticlePrefab: {fileID: 3118160294804996, guid: 0062b7454d349494385800cd4f1e07d5, type: 3}
 --- !u!1001 &2514790947386080302
 PrefabInstance:
   m_ObjectHideFlags: 0

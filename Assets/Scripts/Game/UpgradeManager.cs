@@ -153,4 +153,11 @@ public class UpgradeManager : MonoBehaviour
                 break;
         }
     }
+
+    /// <summary>게임 리셋 — 모든 업그레이드 단계 초기화</summary>
+    public void ResetUpgradeProgress()
+    {
+        foreach (UpgradeData u in upgrades)
+            u.currentLevel = 0;
+    }
 }

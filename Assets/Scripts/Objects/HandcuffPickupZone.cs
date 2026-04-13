@@ -33,6 +33,14 @@ public class HandcuffPickupZone : MonoBehaviour, IInteractable
         return taken;
     }
 
+    /// <summary>게임 리셋 — 적재 수갑 제거</summary>
+    public void ClearStored()
+    {
+        StoredCount = 0;
+        _pickupTimer = 0f;
+        RefreshVisual();
+    }
+
     public void OnInteract(PlayerController player)
     {
         if (StoredCount <= 0) return;

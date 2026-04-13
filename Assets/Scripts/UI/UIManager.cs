@@ -40,6 +40,21 @@ public class UIManager : MonoBehaviour
 
         if (GameManager.Instance != null)
             GameManager.Instance.onPrisonerCountChanged.AddListener(UpdatePrisonerCountUI);
+
+        RefreshPrisonerCountDisplay();
+    }
+
+    /// <summary>
+    /// 첫 프레임·리셋 후 수감 UI를 PrisonCell 기준으로 갱신 (TMP 기본 문구 방지)
+    /// </summary>
+    public void RefreshPrisonerCountDisplay()
+    {
+        if (prisonerCountText == null) return;
+
+        if (PrisonCell.Instance != null)
+            prisonerCountText.text = $"{PrisonCell.Instance.CurrentCount}/{PrisonCell.Instance.MaxCapacity}";
+        else
+            prisonerCountText.text = "0/0";
     }
 
     private void OnDestroy()

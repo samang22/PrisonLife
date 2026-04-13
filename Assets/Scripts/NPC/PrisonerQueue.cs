@@ -203,4 +203,19 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
 
     public int StoredHandcuffs => _storedHandcuffs;
     public int WaitingCount => _waitingPrisoners.Count;
+
+    /// <summary>게임 리셋 — 대기 죄수 제거·납품 수갑·타이머 초기화</summary>
+    public void ResetQueueState()
+    {
+        foreach (PrisonerController p in _waitingPrisoners)
+        {
+            if (p != null) Destroy(p.gameObject);
+        }
+        _waitingPrisoners.Clear();
+        _storedHandcuffs = 0;
+        _deliveryTimer = 0f;
+        _arrestTimer = 0f;
+        _spawnTimer = 0f;
+        handcuffSubmitZone?.RefreshVisual(0);
+    }
 }

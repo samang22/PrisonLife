@@ -23,6 +23,16 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
     [Header("납품 주기 (플레이어)")]
     public float depositInterval = 0.3f;
 
+    [Header("제작 중 연출")]
+    [Tooltip("비우면 이 오브젝트 자신의 Transform. 메쉬만 흔들려면 비주얼 자식 Transform 지정")]
+    public Transform scaleTarget;
+
+    [Tooltip("스케일 진동 속도 (라디안/초, 클수록 빠르게 반복)")]
+    public float pulseSpeed = 6f;
+
+    [Tooltip("기본 크기 대비 진폭 (예: 0.08이면 약 92%~108% 사이)")]
+    public float pulseAmount = 0.08f;
+
     // 변환 완료 시각 큐 (플레이어/워커 공통)
     private readonly List<float> _queue = new List<float>();
     // 큐 항목별 오브젝트: 플레이어 납품=null, 워커 납품=GameObject
@@ -32,6 +42,15 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
     private int _playerOreCount;
 
     private float _depositTimer;
+
+    private Transform _scaleRoot;
+    private Vector3 _baseLocalScale;
+
+    private void Awake()
+    {
+        _scaleRoot = scaleTarget != null ? scaleTarget : transform;
+        _baseLocalScale = _scaleRoot.localScale;
+    }
 
     private void Start()
     {
@@ -55,6 +74,21 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
 
             pickupZone?.AddHandcuff(1);
         }
+
+        UpdateCraftingScalePulse();
+    }
+
+    private void UpdateCraftingScalePulse()
+    {
+        if (_scaleRoot == null) return;
+
+        if (_queue.Count > 0)
+        {
+            float mult = 1f + Mathf.Sin(Time.time * pulseSpeed) * pulseAmount;
+            _scaleRoot.localScale = _baseLocalScale * mult;
+        }
+        else
+            _scaleRoot.localScale = _baseLocalScale;
     }
 
     // 플레이어가 납품 구역에 있는 동안 자동 납품
@@ -113,4 +147,21 @@ public class HandcuffMachine : MonoBehaviour, IInteractable
 
     public int QueueCount => _queue.Count;
     public Transform StackRoot => workerStackRoot;
+
+    /// <summary>게임 리셋 — 변환 큐·스택 시각화 제거 (수갑은 생성하지 않음)</summary>
+    public void ResetMachineState()
+    {
+        _queue.Clear();
+        foreach (GameObject ore in _stackedOres)
+        {
+            if (ore != null) Destroy(ore);
+        }
+        _stackedOres.Clear();
+        _playerOreCount = 0;
+        _depositTimer = 0f;
+        ironOreSubmitZone?.RefreshVisual(0);
+
+        if (_scaleRoot != null)
+            _scaleRoot.localScale = _baseLocalScale;
+    }
 }

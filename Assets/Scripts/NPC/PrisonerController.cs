@@ -39,6 +39,8 @@ public class PrisonerController : MonoBehaviour
         if (IsArrested) return;
         IsArrested = true;
 
+        GetComponent<PrisonerArrestEffect>()?.Spawn();
+
         // 죄수복으로 교체 (defaultEquipment의 "OutWear" 슬롯을 덮어씀)
         if (equipment != null && prisonCostumePrefab != null)
             equipment.Equip("OutWear", prisonCostumePrefab);

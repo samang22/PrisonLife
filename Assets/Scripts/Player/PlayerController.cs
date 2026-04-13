@@ -315,4 +315,34 @@ public class PlayerController : MonoBehaviour
         Gizmos.color = new Color(1f, 0.5f, 0f, 0.8f);
         Gizmos.DrawWireSphere(center, stats.EffectiveMiningRange);
     }
+
+    /// <summary>게임 리셋 — 스탯·인벤·도구·위치 복구</summary>
+    public void ResetRunState(Vector3 position, Quaternion rotation)
+    {
+        _currentInteractable = null;
+        stats?.RuntimeReset();
+
+        IronOreCount   = 0;
+        HandcuffCount  = 0;
+        DollarCount    = 0;
+        _miningTimer   = 0f;
+        _depositsInRange = 0;
+        _verticalVelocity = 0f;
+
+        RefreshStack(ironOreStackRoot, ironOrePrefab, 0);
+        RefreshStack(handcuffStackRoot, handcuffPrefab, 0);
+        RefreshStack(dollarStackRoot, dollarPrefab, 0);
+        UIManager.Instance?.UpdateDollarsUI(0);
+
+        RefreshTool();
+
+        if (_cc != null)
+        {
+            _cc.enabled = false;
+            transform.SetPositionAndRotation(position, rotation);
+            _cc.enabled = true;
+        }
+        else
+            transform.SetPositionAndRotation(position, rotation);
+    }
 }

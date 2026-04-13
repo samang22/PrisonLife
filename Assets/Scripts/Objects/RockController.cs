@@ -16,11 +16,15 @@ public class RockController : MonoBehaviour
     private float _respawnTimer;
     private Renderer[] _renderers;
     private Collider[] _colliders;
+    private bool[] _colliderEnabledInitially;
 
     private void Awake()
     {
         _renderers = GetComponentsInChildren<Renderer>();
         _colliders = GetComponentsInChildren<Collider>();
+        _colliderEnabledInitially = new bool[_colliders.Length];
+        for (int i = 0; i < _colliders.Length; i++)
+            _colliderEnabledInitially[i] = _colliders[i].enabled;
     }
 
     private void Update()
@@ -78,6 +82,23 @@ public class RockController : MonoBehaviour
         Debug.Log($"[RockController] 재생성 - {gameObject.name}");
 
         foreach (Renderer r in _renderers) r.enabled = true;
-        foreach (Collider c in _colliders) c.enabled = true;
+        RestoreColliderStates();
+    }
+
+    /// <summary>게임 리셋 시 즉시 채굴 가능 상태로 복구</summary>
+    public void ResetToAvailable()
+    {
+        _isDepleted = false;
+        _respawnTimer = 0f;
+        foreach (Renderer r in _renderers) r.enabled = true;
+        RestoreColliderStates();
+    }
+
+    private void RestoreColliderStates()
+    {
+        if (_colliders == null || _colliderEnabledInitially == null) return;
+        int n = Mathf.Min(_colliders.Length, _colliderEnabledInitially.Length);
+        for (int i = 0; i < n; i++)
+            _colliders[i].enabled = _colliderEnabledInitially[i];
     }
 }

@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 435913828667579095}
   - component: {fileID: 3525078720759305657}
   - component: {fileID: 469396520920353675}
+  - component: {fileID: 876079513793530084}
   m_Layer: 8
   m_Name: Prisoner
   m_TagString: Untagged
@@ -115,6 +116,21 @@ MonoBehaviour:
   arcHeight: 1.5
   speedParam: Speed
   miningParam: 
+--- !u!114 &876079513793530084
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1538926474730163878}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f5b2c539100433449556fee82fc8c96, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectPrefab: {fileID: 5892097141864354844, guid: 5dd4e2590f1c466458bbbf99c00ae705, type: 3}
+  localSpawnOffset: {x: 0, y: 1, z: 0}
+  matchPrisonerRotation: 1
 --- !u!1001 &3880834875663592420
 PrefabInstance:
   m_ObjectHideFlags: 0

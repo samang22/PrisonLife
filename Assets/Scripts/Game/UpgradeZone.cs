@@ -117,4 +117,14 @@ public class UpgradeZone : MonoBehaviour, IInteractable
     }
 
     // 플레이어가 구역을 벗어나면 진행 초기화 없이 유지 (재진입 시 이어서 납부)
+
+    /// <summary>게임 리셋 — 납부 진행도 초기화, disableOnMax로 꺼진 오브젝트 복구</summary>
+    public void ResetPaymentProgress()
+    {
+        _paid = 0;
+        _drainTimer = 0f;
+        gameObject.SetActive(true);
+        RefreshCost();
+        RefreshUI();
+    }
 }
