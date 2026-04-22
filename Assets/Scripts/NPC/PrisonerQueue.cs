@@ -1,14 +1,7 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 죄수 대기 구역
-/// - 자동으로 Prisoner를 스폰하여 줄 세움
-/// - 플레이어가 수갑을 납품하면 맨 앞 죄수부터 순서대로 체포
-/// - 체포 후 남은 죄수들이 한 칸씩 앞으로 이동
-/// </summary>
-public class PrisonerQueue : MonoBehaviour, IInteractable
+public class PrisonerQueue : MonoBehaviour, IInteractable, IResettable
 {
     [Header("스폰 설정")]
     public GameObject prisonerPrefab;
@@ -16,13 +9,13 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
     public float spawnInterval = 3f;
 
     [Header("위치 바인딩")]
-    public Transform spawnPoint;         // 죄수가 생성되는 위치
-    public Transform queueStartPoint;    // 줄의 맨 앞 (체포 위치)
-    public Transform prisonCellEntrance; // 체포 후 죄수가 이동할 감옥 입구
+    public Transform spawnPoint;
+    public Transform queueStartPoint;
+    public Transform prisonCellEntrance;
 
     [Header("줄 서기 설정")]
-    public float queueSpacing = 1.2f;   // 줄 간격
-    public float shiftSpeed = 5f;       // 앞으로 이동 속도
+    public float queueSpacing = 1.2f;
+    public float shiftSpeed = 5f;
 
     [Header("연결 - 납품 구역")]
     public HandcuffSubmitRelay handcuffSubmitZone;
@@ -43,10 +36,14 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
     private float _arrestTimer;
     private float _spawnTimer;
 
+    private void Awake() => ResetRegistry.Register(this);
+    private void OnDestroy() => ResetRegistry.Unregister(this);
+
+    public void ResetState() => ResetQueueState();
+
     private void Start()
     {
-        // HandcuffSubmitZone이 이 PrisonerQueue를 참조하도록 자동 설정
-        // (Awake 대신 Start 사용 - HandcuffSubmitRelay.Awake 이후 실행 보장)
+        // HandcuffSubmitRelay.Awake 이후 실행을 보장하기 위해 Start 사용
         if (handcuffSubmitZone != null)
             handcuffSubmitZone.queue = this;
     }
@@ -65,7 +62,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         UpdateQueuePositions();
     }
 
-    // ── 자동 스폰 ──
     private void TrySpawn()
     {
         if (prisonerPrefab == null) return;
@@ -75,7 +71,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         if (_spawnTimer < spawnInterval) return;
         _spawnTimer = 0f;
 
-        // spawnPoint가 지정된 경우 해당 위치에 스폰, 아니면 줄 마지막 위치에 스폰
         Vector3 pos = spawnPoint != null
             ? spawnPoint.position
             : GetQueuePosition(_waitingPrisoners.Count);
@@ -86,8 +81,7 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
             _waitingPrisoners.Add(prisoner);
     }
 
-    // ── 줄 위치 계산 (앞=0번, 뒤로 갈수록 index 증가) ──
-    // SpawnPoint와 QueueStartPoint가 모두 지정된 경우: 두 지점을 잇는 직선 위에 배치
+    // SpawnPoint와 QueueStartPoint 사이 직선 위에 index 간격으로 배치
     private Vector3 GetQueuePosition(int index)
     {
         if (queueStartPoint == null)
@@ -102,10 +96,8 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         return queueStartPoint.position + queueStartPoint.forward * -(index * queueSpacing);
     }
 
-    // ── 매 프레임 줄 서기 위치로 부드럽게 이동 + 진행 방향을 바라보도록 회전 ──
     private void UpdateQueuePositions()
     {
-        // 줄의 진행 방향: SpawnPoint → QueueStartPoint
         Vector3 faceDir = GetQueueFaceDirection();
 
         for (int i = 0; i < _waitingPrisoners.Count; i++)
@@ -131,7 +123,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         }
     }
 
-    // SpawnPoint → QueueStartPoint 방향 (줄이 바라보는 방향)
     private Vector3 GetQueueFaceDirection()
     {
         if (queueStartPoint == null) return transform.forward;
@@ -142,7 +133,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         return dir.normalized;
     }
 
-    // ── 플레이어 수갑 납품 ──
     public void OnInteract(PlayerController player)
     {
         if (player.HandcuffCount <= 0) return;
@@ -156,13 +146,12 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         handcuffSubmitZone?.RefreshVisual(_storedHandcuffs);
     }
 
-    // ── 맨 앞 죄수 체포 ──
     private void TryArrestNext()
     {
         if (_storedHandcuffs < handcuffsPerPrisoner) return;
         if (_waitingPrisoners.Count == 0) return;
 
-        // PrisonCell이 포화 상태면 체포 중단 (수갑 소모 없음)
+        // PrisonCell 포화 시 수갑 소모 없이 체포 중단
         if (prisonCell != null && prisonCell.IsFull) return;
 
         PrisonerController prisoner = _waitingPrisoners[0];
@@ -179,8 +168,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
 
         dollarZone?.AddDollars(rewardPerPrisoner);
 
-        // prisonCellEntrance가 지정된 경우: 입구까지 이동 후 수감 처리
-        // 지정되지 않은 경우: 즉시 수감 처리
         if (prisonCellEntrance != null)
         {
             prisoner.MoveToCell(prisonCellEntrance.position, () =>
@@ -194,7 +181,7 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
         }
     }
 
-    // OfficerController에서 호출 - 플레이어 없이 직접 수갑 납품
+    // OfficerController에서 직접 호출 (플레이어 없이 수갑 납품)
     public void SubmitHandcuffByOfficer(int amount = 1)
     {
         _storedHandcuffs += amount;
@@ -204,7 +191,6 @@ public class PrisonerQueue : MonoBehaviour, IInteractable
     public int StoredHandcuffs => _storedHandcuffs;
     public int WaitingCount => _waitingPrisoners.Count;
 
-    /// <summary>게임 리셋 — 대기 죄수 제거·납품 수갑·타이머 초기화</summary>
     public void ResetQueueState()
     {
         foreach (PrisonerController p in _waitingPrisoners)

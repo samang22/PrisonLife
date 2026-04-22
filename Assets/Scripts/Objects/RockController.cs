@@ -1,9 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 철광석 광맥 - 플레이어가 접근하면 자동 채굴, 철광석을 등에 쌓아줌
-/// </summary>
-public class RockController : MonoBehaviour
+public class RockController : MonoBehaviour, IResettable
 {
     [Header("채굴 설정")]
     public bool respawn = true;
@@ -16,15 +14,28 @@ public class RockController : MonoBehaviour
     private float _respawnTimer;
     private Renderer[] _renderers;
     private Collider[] _colliders;
+    // Awake에서 초기 enabled 상태를 저장해 재생성 시 그대로 복원
     private bool[] _colliderEnabledInitially;
+
+    // 씬 내 모든 RockController를 캐싱 (FindObjectsOfType 반복 호출 방지)
+    private static readonly List<RockController> _all = new List<RockController>();
+    public static IReadOnlyList<RockController> All => _all;
 
     private void Awake()
     {
+        _all.Add(this);
+        ResetRegistry.Register(this);
         _renderers = GetComponentsInChildren<Renderer>();
         _colliders = GetComponentsInChildren<Collider>();
         _colliderEnabledInitially = new bool[_colliders.Length];
         for (int i = 0; i < _colliders.Length; i++)
             _colliderEnabledInitially[i] = _colliders[i].enabled;
+    }
+
+    private void OnDestroy()
+    {
+        _all.Remove(this);
+        ResetRegistry.Unregister(this);
     }
 
     private void Update()
@@ -37,7 +48,6 @@ public class RockController : MonoBehaviour
         }
     }
 
-    // PlayerController.HandleMining()에서 호출
     public void Mine(PlayerController player)
     {
         if (_isDepleted) return;
@@ -50,7 +60,6 @@ public class RockController : MonoBehaviour
         Deplete();
     }
 
-    // WorkerController에서 호출 - 채굴 성공 여부 반환
     public bool MineByWorker()
     {
         if (_isDepleted) return false;
@@ -69,7 +78,7 @@ public class RockController : MonoBehaviour
         _isDepleted = true;
         _respawnTimer = respawnTime;
 
-        Debug.Log($"[RockController] 고갈 - {gameObject.name} / {respawnTime}초 후 재생성");
+        Debug.Log($"[RockController] 고갈 {gameObject.name} / {respawnTime}초 후 재생성");
 
         foreach (Renderer r in _renderers) r.enabled = false;
         foreach (Collider c in _colliders) c.enabled = false;
@@ -79,13 +88,14 @@ public class RockController : MonoBehaviour
     {
         _isDepleted = false;
 
-        Debug.Log($"[RockController] 재생성 - {gameObject.name}");
+        Debug.Log($"[RockController] 재생성 {gameObject.name}");
 
         foreach (Renderer r in _renderers) r.enabled = true;
         RestoreColliderStates();
     }
 
-    /// <summary>게임 리셋 시 즉시 채굴 가능 상태로 복구</summary>
+    public void ResetState() => ResetToAvailable();
+
     public void ResetToAvailable()
     {
         _isDepleted = false;

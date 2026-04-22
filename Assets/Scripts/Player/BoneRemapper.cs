@@ -1,21 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 메시의 Bones 배열을 skeletonRoot의 동명 본으로 자동 바인딩
-/// ithappy 모듈식 캐릭터처럼 본 이름이 공유되는 경우에 사용
-/// </summary>
+// skeletonRoot 하위 본 이름을 기준으로 SMR의 bones 배열을 교체
+// 서로 다른 프리팹의 메시를 같은 캐릭터 스켈레톤에 붙일 때 사용
 public static class BoneRemapper
 {
-    /// <summary>
-    /// target SMR의 bones를 skeletonRoot 하위의 동명 Transform으로 교체
-    /// </summary>
     public static void Remap(SkinnedMeshRenderer target, Transform skeletonRoot)
     {
-        // 스켈레톤의 모든 본을 이름 기준으로 딕셔너리 구성
         Dictionary<string, Transform> boneMap = BuildBoneMap(skeletonRoot);
 
-        // Bones 배열 교체
         Transform[] originalBones = target.bones;
         Transform[] newBones = new Transform[originalBones.Length];
 
@@ -31,7 +24,6 @@ public static class BoneRemapper
 
         target.bones = newBones;
 
-        // Root Bone 교체
         if (target.rootBone != null &&
             boneMap.TryGetValue(target.rootBone.name, out Transform mappedRoot))
         {

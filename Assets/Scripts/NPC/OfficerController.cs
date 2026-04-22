@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// 경찰관 NPC - HandcuffPickupZone에서 수갑을 가져와 HandcuffSubmitZone에 납품
-/// Idle → MovingToPickup → Picking → MovingToSubmit → Submitting → Idle
-/// </summary>
 public class OfficerController : MonoBehaviour
 {
     [Header("연결")]
@@ -11,24 +7,23 @@ public class OfficerController : MonoBehaviour
     public HandcuffSubmitRelay handcuffSubmitZone;
 
     [Header("이동 설정")]
-    public float moveSpeed    = 3.5f;
-    public float arriveRange  = 1.2f;
+    public float moveSpeed   = 3.5f;
+    public float arriveRange = 1.2f;
 
     [Header("수갑 수거 설정")]
-    public int   maxCarry          = 10;
-    public float pickupInterval    = 0.2f;
-    public float submitInterval    = 0.2f;
+    public int   maxCarry       = 10;
+    public float pickupInterval = 0.2f;
+    public float submitInterval = 0.2f;
 
     [Header("수갑 스택 시각화")]
     public Transform  handcuffStackRoot;
     public GameObject handcuffVisualPrefab;
     public float      stackSpacing = 0.08f;
 
-    [Header("애니메이션 (선택)")]
+    [Header("애니메이션")]
     public Animator animator;
     public string speedParam = "Vert";
 
-    // ── 상태 ──
     private enum State { Idle, MovingToPickup, Picking, MovingToSubmit, Submitting }
     private State _state = State.Idle;
 
@@ -56,7 +51,6 @@ public class OfficerController : MonoBehaviour
         }
     }
 
-    // ── Idle: 픽업존에 수갑이 있으면 출발 ──
     private void UpdateIdle()
     {
         SetAnimSpeed(0f);
@@ -66,12 +60,9 @@ public class OfficerController : MonoBehaviour
         _idleTimer = 0f;
 
         if (pickupZone != null && pickupZone.StoredCount > 0)
-        {
             _state = State.MovingToPickup;
-        }
     }
 
-    // ── MovingToPickup: 픽업존으로 이동 ──
     private void UpdateMovingToPickup()
     {
         if (pickupZone == null) { _state = State.Idle; return; }
@@ -83,7 +74,6 @@ public class OfficerController : MonoBehaviour
         }
     }
 
-    // ── Picking: 수갑 수거 ──
     private void UpdatePicking()
     {
         SetAnimSpeed(0f);
@@ -98,7 +88,6 @@ public class OfficerController : MonoBehaviour
         _carried += taken;
         RefreshCarryVisual();
 
-        // maxCarry만큼 채웠거나 픽업존이 비었으면 납품 이동
         if (_carried >= maxCarry || pickupZone.StoredCount <= 0)
         {
             if (_carried > 0)
@@ -108,7 +97,6 @@ public class OfficerController : MonoBehaviour
         }
     }
 
-    // ── MovingToSubmit: HandcuffSubmitZone으로 이동 ──
     private void UpdateMovingToSubmit()
     {
         if (handcuffSubmitZone == null) { _state = State.Idle; return; }
@@ -120,7 +108,6 @@ public class OfficerController : MonoBehaviour
         }
     }
 
-    // ── Submitting: 수갑 1개씩 납품 (HandcuffSubmitZone → PrisonerQueue) ──
     private void UpdateSubmitting()
     {
         SetAnimSpeed(0f);
@@ -139,7 +126,7 @@ public class OfficerController : MonoBehaviour
             _state = State.Idle;
     }
 
-    // ── 공통 이동 (Y 고정) → 도달 시 true 반환 ──
+    // Y축을 고정하고 수평으로만 이동, 도달 시 true 반환
     private bool MoveToward(Vector3 targetWorldPos)
     {
         Vector3 myPos    = transform.position;
@@ -175,16 +162,25 @@ public class OfficerController : MonoBehaviour
     {
         if (handcuffStackRoot == null || handcuffVisualPrefab == null) return;
 
-        foreach (Transform child in handcuffStackRoot)
-            Destroy(child.gameObject);
+        int current = handcuffStackRoot.childCount;
+
+        for (int i = _carried; i < current; i++)
+            handcuffStackRoot.GetChild(i).gameObject.SetActive(false);
 
         for (int i = 0; i < _carried; i++)
         {
-            Vector3 offset = Vector3.up * i * stackSpacing;
-            Instantiate(handcuffVisualPrefab,
-                        handcuffStackRoot.position + offset,
-                        handcuffStackRoot.rotation,
-                        handcuffStackRoot);
+            GameObject obj;
+            if (i < current)
+            {
+                obj = handcuffStackRoot.GetChild(i).gameObject;
+                obj.SetActive(true);
+            }
+            else
+            {
+                obj = Instantiate(handcuffVisualPrefab, handcuffStackRoot);
+            }
+            obj.transform.localPosition = Vector3.up * i * stackSpacing;
+            obj.transform.localRotation = Quaternion.identity;
         }
     }
 

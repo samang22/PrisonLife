@@ -1,11 +1,7 @@
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// 업그레이드 구매 구역 - 플레이어가 머물면 달러가 1원씩 차감되고
-/// 요구 비용이 모두 채워지면 업그레이드 적용
-/// </summary>
-public class UpgradeZone : MonoBehaviour, IInteractable
+public class UpgradeZone : MonoBehaviour, IInteractable, IResettable
 {
     [Header("업그레이드 타입")]
     public UpgradeType upgradeType;
@@ -16,12 +12,17 @@ public class UpgradeZone : MonoBehaviour, IInteractable
     public GameObject maxLevelIndicator;
 
     [Header("설정")]
-    public float drainInterval  = 0.05f;
-    public bool  disableOnMax   = false;   // true면 MAX 도달 시 이 GameObject 비활성화
+    public float drainInterval = 0.05f;
+    public bool  disableOnMax  = false;
 
     private float _drainTimer;
     private int _paid;
     private int _currentLevelCost;
+
+    private void Awake() => ResetRegistry.Register(this);
+    private void OnDestroy() => ResetRegistry.Unregister(this);
+
+    public void ResetState() => ResetPaymentProgress();
 
     private void Start()
     {
@@ -31,7 +32,7 @@ public class UpgradeZone : MonoBehaviour, IInteractable
 
     private void Update()
     {
-        // HireWorker는 감옥 상태가 실시간으로 바뀌므로 매 프레임 UI 갱신
+        // HireWorker는 감옥 상태가 실시간으로 바뀌므로 매 프레임 갱신
         if (upgradeType == UpgradeType.HireWorker)
             RefreshUI();
     }
@@ -68,7 +69,7 @@ public class UpgradeZone : MonoBehaviour, IInteractable
 
     private void RefreshUI()
     {
-        // HireWorker: 감옥에 죄수가 아예 없으면 비용/MAX 표시 모두 공란
+        // 감옥에 죄수가 없으면 공란, 전원 고용 완료면 MAX 표시
         if (upgradeType == UpgradeType.HireWorker)
         {
             bool noPrisoners = PrisonCell.Instance == null || PrisonCell.Instance.CurrentCount == 0;
@@ -116,9 +117,6 @@ public class UpgradeZone : MonoBehaviour, IInteractable
             gameObject.SetActive(false);
     }
 
-    // 플레이어가 구역을 벗어나면 진행 초기화 없이 유지 (재진입 시 이어서 납부)
-
-    /// <summary>게임 리셋 — 납부 진행도 초기화, disableOnMax로 꺼진 오브젝트 복구</summary>
     public void ResetPaymentProgress()
     {
         _paid = 0;

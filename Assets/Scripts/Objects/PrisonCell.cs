@@ -2,10 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 감옥 수용 구역 - 콜라이더 영역 안에 죄수가 위치하면 됨
-/// 최대 수용 시 흔들림 연출
-/// </summary>
 public class PrisonCell : MonoBehaviour
 {
     public static PrisonCell Instance { get; private set; }
@@ -15,8 +11,8 @@ public class PrisonCell : MonoBehaviour
     public int capacityPerExpansion = 5;
 
     [Header("확장 연출")]
-    public Vector3 expansionPerLevel = new Vector3(2f, 0f, 2f); // 단계당 콜라이더 size 증가량
-    public Transform floorVisual;                                // 바닥 비주얼 오브젝트
+    public Vector3 expansionPerLevel = new Vector3(2f, 0f, 2f);
+    public Transform floorVisual;
 
     [Header("일꾼 고용 설정")]
     public IronOreSubmitRelay ironOreSubmitZone;
@@ -85,7 +81,6 @@ public class PrisonCell : MonoBehaviour
 
         GameManager.Instance?.NotifyPrisonerAdded(_currentCount, _maxCapacity);
 
-        // 수용량 한계 도달 시 흔들림 연출
         if (_currentCount >= _maxCapacity && !_isShaking)
         {
             Debug.Log($"[PrisonCell] 흔들림 시작 - shakeTarget: {(shakeTarget != null ? shakeTarget.name : "null(self)")}");
@@ -98,11 +93,10 @@ public class PrisonCell : MonoBehaviour
         _expansionLevel++;
         _maxCapacity = baseCapacity + _expansionLevel * capacityPerExpansion;
 
-        // BoxCollider 확장
         if (_area != null)
             _area.size = _baseColliderSize + expansionPerLevel * _expansionLevel;
 
-        // 바닥 비주얼 확장 (X, Z 비율을 콜라이더에 맞게 조정)
+        // 바닥 비주얼을 콜라이더 비율에 맞게 동기화
         if (floorVisual != null && _baseColliderSize.x > 0 && _baseColliderSize.z > 0)
         {
             Vector3 newSize = _baseColliderSize + expansionPerLevel * _expansionLevel;
@@ -113,11 +107,9 @@ public class PrisonCell : MonoBehaviour
             );
         }
 
-        // 수용량 변경을 UI에 즉시 반영
         GameManager.Instance?.NotifyPrisonerAdded(_currentCount, _maxCapacity);
     }
 
-    // 콜라이더 영역 내 랜덤 위치 반환 (Y는 groundY로 고정)
     private Vector3 GetRandomPositionInArea()
     {
         if (_area == null)
@@ -138,7 +130,7 @@ public class PrisonCell : MonoBehaviour
         Vector3 originalPos = target.localPosition;
         float elapsed = 0f;
 
-        // 가득 찬 상태가 유지되는 동안 계속 반복
+        // IsFull 상태가 유지되는 동안 계속 반복
         while (IsFull)
         {
             float offsetX = Mathf.Sin(elapsed * shakeFrequency) * shakeAmplitude;
@@ -152,10 +144,6 @@ public class PrisonCell : MonoBehaviour
         _isShaking = false;
     }
 
-    /// <summary>
-    /// PrisonCell에 수감된 죄수 중 WorkerController가 비활성 상태인 죄수를 count명 고용
-    /// 고용 후 IronOreSubmitRelay를 타겟으로 설정하고 WorkerController 활성화
-    /// </summary>
     public void HireWorkers(int count)
     {
         int hired = 0;
@@ -178,9 +166,6 @@ public class PrisonCell : MonoBehaviour
     public int CurrentCount => _currentCount;
     public bool IsFull => _currentCount >= _maxCapacity;
 
-    /// <summary>
-    /// 감옥 내 WorkerController가 비활성인 죄수(미고용)가 1명 이상 있는지 여부
-    /// </summary>
     public bool HasUnhiredPrisoners
     {
         get
@@ -195,7 +180,6 @@ public class PrisonCell : MonoBehaviour
         }
     }
 
-    /// <summary>게임 리셋 — 수갑·확장·흔들림·죄수 제거</summary>
     public void ResetToInitialState()
     {
         StopAllCoroutines();

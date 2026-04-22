@@ -8,10 +8,6 @@ public class EquipmentSlot
     public GameObject prefab;
 }
 
-/// <summary>
-/// 슬롯 기반 모듈식 캐릭터 메시 교체 시스템
-/// prefab에서 SkinnedMeshRenderer를 자동 추출하여 바인딩
-/// </summary>
 public class CharacterEquipment : MonoBehaviour
 {
     [Header("스켈레톤 루트 (Base_Mesh 하위 Root 본)")]
@@ -20,7 +16,7 @@ public class CharacterEquipment : MonoBehaviour
     [Header("초기 장착 메시 목록")]
     public List<EquipmentSlot> defaultEquipment = new List<EquipmentSlot>();
 
-    // 슬롯 이름 → 현재 장착된 SkinnedMeshRenderer
+    // 슬롯 이름으로 현재 장착된 SMR을 관리
     private readonly Dictionary<string, SkinnedMeshRenderer> _slots
         = new Dictionary<string, SkinnedMeshRenderer>();
 
@@ -33,16 +29,12 @@ public class CharacterEquipment : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 슬롯에 새 메시 장착. prefab에서 SMR을 자동 추출하여 바인딩.
-    /// </summary>
     public void Equip(string slotName, GameObject prefab)
     {
         Unequip(slotName);
 
         if (prefab == null) return;
 
-        // 프리팹에서 SMR 추출
         SkinnedMeshRenderer sourceSMR = prefab.GetComponentInChildren<SkinnedMeshRenderer>();
         if (sourceSMR == null)
         {
@@ -50,18 +42,15 @@ public class CharacterEquipment : MonoBehaviour
             return;
         }
 
-        // 새 슬롯 오브젝트 생성
         GameObject instance = new GameObject(slotName);
         instance.transform.SetParent(transform);
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         instance.transform.localScale = Vector3.one;
 
-        // SMR 데이터 복사
         SkinnedMeshRenderer newSMR = instance.AddComponent<SkinnedMeshRenderer>();
         CopySMRData(sourceSMR, newSMR);
 
-        // 스켈레톤에 본 배열 바인딩
         if (skeletonRoot != null)
             BoneRemapper.Remap(newSMR, skeletonRoot);
         else
@@ -70,9 +59,6 @@ public class CharacterEquipment : MonoBehaviour
         _slots[slotName] = newSMR;
     }
 
-    /// <summary>
-    /// 슬롯 비우기
-    /// </summary>
     public void Unequip(string slotName)
     {
         if (_slots.TryGetValue(slotName, out SkinnedMeshRenderer existing))
@@ -83,9 +69,6 @@ public class CharacterEquipment : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 현재 슬롯의 SMR 반환 (없으면 null)
-    /// </summary>
     public SkinnedMeshRenderer GetSlot(string slotName)
     {
         _slots.TryGetValue(slotName, out SkinnedMeshRenderer smr);

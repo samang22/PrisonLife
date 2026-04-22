@@ -28,8 +28,8 @@ public class PlayerController : MonoBehaviour
     public LayerMask miningLayerMask = ~0;
 
     [Header("장비 (드릴 단계별 프리팹)")]
-    public Transform toolSocket;           // 장비가 붙을 위치 (Player 자식 Transform)
-    public GameObject[] drillPrefabs = new GameObject[3];  // [0]=1단계 [1]=2단계 [2]=3단계
+    public Transform toolSocket;
+    public GameObject[] drillPrefabs = new GameObject[3];
 
     public int IronOreCount { get; private set; }
     public int HandcuffCount { get; private set; }
@@ -40,7 +40,6 @@ public class PlayerController : MonoBehaviour
     private IInteractable _currentInteractable;
     private GameObject _currentToolInstance;
 
-    // 채굴 전용
     private int _depositsInRange;
     private float _miningTimer;
 
@@ -65,7 +64,6 @@ public class PlayerController : MonoBehaviour
         SetToolVisible(HasDepositInRange());
     }
 
-    // ── 장비 교체 ──
     public void RefreshTool()
     {
         if (_currentToolInstance != null)
@@ -79,12 +77,10 @@ public class PlayerController : MonoBehaviour
         int level = Mathf.Clamp(stats.drillLevel, 0, drillPrefabs.Length - 1);
         if (drillPrefabs[level] == null) return;
 
-        // MiningRange 중심(플레이어 정면 Z+1)에 위치
+        // 채굴 범위 중심(정면 Z+1)에 도구 배치
         _currentToolInstance = Instantiate(drillPrefabs[level], transform);
         _currentToolInstance.transform.localPosition = Vector3.forward * 1f;
         _currentToolInstance.transform.localRotation = Quaternion.identity;
-
-        // 기본 숨김: 채굴 중일 때만 노출
         _currentToolInstance.SetActive(_depositsInRange > 0);
     }
 
@@ -104,7 +100,6 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
-    // ── 철광석 ──
     public bool CanPickupIronOre() => IronOreCount < stats.maxIronOreCarry;
 
     public void AddIronOre(int amount = 1)
@@ -124,7 +119,6 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    // ── 수갑 ──
     public bool CanPickupHandcuff() => HandcuffCount < stats.maxHandcuffCarry;
 
     public void AddHandcuff(int amount = 1)
@@ -144,7 +138,6 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    // ── 달러 ──
     public void AddDollar(int amount = 1)
     {
         DollarCount += amount;
@@ -161,7 +154,8 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    // 스택 시각화: 오브젝트 풀링 — 초과분 비활성화, 부족분만 신규 생성
+    // 오브젝트 풀링 방식으로 스택 비주얼 갱신
+    // 초과분은 비활성화, 부족분만 새로 생성
     private void RefreshStack(Transform root, GameObject prefab, int count)
     {
         if (root == null || prefab == null) return;
@@ -192,6 +186,7 @@ public class PlayerController : MonoBehaviour
     {
         Vector2 input = joystick != null ? joystick.Direction : Vector2.zero;
         Vector3 move = new Vector3(input.x, 0f, input.y);
+        // 카메라가 45도 각도를 보고 있으므로 입력 벡터를 동일하게 회전
         move = Quaternion.Euler(0, 45f, 0) * move;
 
         if (_cc.isGrounded)
@@ -207,6 +202,7 @@ public class PlayerController : MonoBehaviour
             mag = new Vector3(input.x, 0, input.y).magnitude;
             animator.SetFloat(VertHash, mag > 0.1f ? 1f : 0f);
 
+        // Y 성분 제거 후 이동 방향으로 부드럽게 회전
         Vector3 flatMove = new Vector3(move.x, 0, move.z);
         if (flatMove.magnitude > 0.1f)
         {
@@ -221,13 +217,11 @@ public class PlayerController : MonoBehaviour
             _currentInteractable.OnInteract(this);
     }
 
-    // ── 채굴 ──
-    // 1단계(drillLevel 0): 0.5초마다 정면 1개
-    // 2단계(drillLevel 1): 접촉 즉시 1개 (OnTriggerEnter 처리)
-    // 3단계(drillLevel 2): 접촉 즉시 범위 내 전체 (OnTriggerEnter 처리)
+    // drillLevel 0: 0.5초마다 정면 최근접 1개
+    // drillLevel 1, 2: OnTriggerEnter에서 즉시 처리
     private void HandleMining()
     {
-        if (stats == null || stats.drillLevel >= 1) return;  // 2·3단계는 OnTriggerEnter 처리
+        if (stats == null || stats.drillLevel >= 1) return;
 
         if (_depositsInRange <= 0) { _miningTimer = 0f; return; }
 
@@ -235,12 +229,10 @@ public class PlayerController : MonoBehaviour
         if (_miningTimer < stats.miningInterval) return;
         _miningTimer = 0f;
 
-        // 1단계: 범위 내 가장 가까운 Deposit 1개 채굴
         RockController nearest = GetNearestDeposit();
         nearest?.Mine(this);
     }
 
-    // 채굴 범위 중심에서 가장 가까운 활성 RockController 반환
     private RockController GetNearestDeposit()
     {
         Vector3 center = transform.position + transform.forward * 1f;
@@ -275,13 +267,11 @@ public class PlayerController : MonoBehaviour
 
             if (stats == null) return;
 
-            // 2단계(drillLevel 1): 범위 내 가장 가까운 Deposit 즉시 1개 채굴
             if (stats.drillLevel == 1)
             {
                 RockController nearest = GetNearestDeposit();
                 nearest?.Mine(this);
             }
-            // 3단계(drillLevel 2): 범위 내 모든 Deposit 즉시 채굴
             else if (stats.drillLevel == 2)
             {
                 Vector3 center = transform.position + transform.forward * 1f;
@@ -316,7 +306,7 @@ public class PlayerController : MonoBehaviour
             _currentInteractable = null;
     }
 
-    // Scene View에서 채굴 범위 시각화 (Z+1 오프셋 반영)
+    // Scene View에서 채굴 범위 시각화
     private void OnDrawGizmosSelected()
     {
         if (stats == null) return;
@@ -327,16 +317,15 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireSphere(center, stats.EffectiveMiningRange);
     }
 
-    /// <summary>게임 리셋 — 스탯·인벤·도구·위치 복구</summary>
     public void ResetRunState(Vector3 position, Quaternion rotation)
     {
         _currentInteractable = null;
         stats?.RuntimeReset();
 
-        IronOreCount   = 0;
-        HandcuffCount  = 0;
-        DollarCount    = 0;
-        _miningTimer   = 0f;
+        IronOreCount     = 0;
+        HandcuffCount    = 0;
+        DollarCount      = 0;
+        _miningTimer     = 0f;
         _depositsInRange = 0;
         _verticalVelocity = 0f;
 

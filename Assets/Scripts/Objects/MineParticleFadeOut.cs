@@ -2,10 +2,8 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-/// <summary>
-/// 채굴 이펙트 프리팹용 — duration(기본 0.5초) 동안 배율 1→2→매우 작게 변화 후 오브젝트를 제거합니다.
-/// RockController의 mineParticlePrefab 루트에 붙여 사용합니다.
-/// </summary>
+// duration 동안 스케일 1 -> 2 -> 거의 0 으로 변화 후 오브젝트 제거
+// RockController.mineParticlePrefab 루트에 붙여서 사용
 public class MineParticleFadeOut : MonoBehaviour
 {
     [SerializeField, FormerlySerializedAs("fadeDuration")]

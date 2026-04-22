@@ -1,10 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// 수갑 픽업 구역 - 제작대에서 변환된 수갑이 쌓이는 곳
-/// 플레이어가 진입하면 1개씩 가슴에 추가
-/// </summary>
-public class HandcuffPickupZone : MonoBehaviour, IInteractable
+public class HandcuffPickupZone : MonoBehaviour, IInteractable, IResettable
 {
     [Header("설정")]
     public float pickupInterval = 0.2f;
@@ -18,13 +14,17 @@ public class HandcuffPickupZone : MonoBehaviour, IInteractable
 
     private float _pickupTimer;
 
+    private void Awake() => ResetRegistry.Register(this);
+    private void OnDestroy() => ResetRegistry.Unregister(this);
+
+    public void ResetState() => ClearStored();
+
     public void AddHandcuff(int amount = 1)
     {
         StoredCount += amount;
         RefreshVisual();
     }
 
-    // OfficerController에서 호출 - 실제 가져간 수량 반환
     public int TakeHandcuff(int amount = 1)
     {
         int taken = Mathf.Min(amount, StoredCount);
@@ -33,7 +33,6 @@ public class HandcuffPickupZone : MonoBehaviour, IInteractable
         return taken;
     }
 
-    /// <summary>게임 리셋 — 적재 수갑 제거</summary>
     public void ClearStored()
     {
         StoredCount = 0;
@@ -59,16 +58,25 @@ public class HandcuffPickupZone : MonoBehaviour, IInteractable
     {
         if (stackRoot == null || handcuffVisualPrefab == null) return;
 
-        foreach (Transform child in stackRoot)
-            Destroy(child.gameObject);
+        int current = stackRoot.childCount;
+
+        for (int i = StoredCount; i < current; i++)
+            stackRoot.GetChild(i).gameObject.SetActive(false);
 
         for (int i = 0; i < StoredCount; i++)
         {
-            Vector3 offset = Vector3.up * i * stackSpacing;
-            Instantiate(handcuffVisualPrefab,
-                        stackRoot.position + offset,
-                        stackRoot.rotation,
-                        stackRoot);
+            GameObject obj;
+            if (i < current)
+            {
+                obj = stackRoot.GetChild(i).gameObject;
+                obj.SetActive(true);
+            }
+            else
+            {
+                obj = Instantiate(handcuffVisualPrefab, stackRoot);
+            }
+            obj.transform.localPosition = Vector3.up * i * stackSpacing;
+            obj.transform.localRotation = Quaternion.identity;
         }
     }
 }

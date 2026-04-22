@@ -25,6 +25,7 @@ public class UIManager : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
+            // 중복 Singleton 처리: Canvas 오브젝트가 아닌 컴포넌트만 제거
             Destroy(this);
             return;
         }
@@ -41,12 +42,10 @@ public class UIManager : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.onPrisonerCountChanged.AddListener(UpdatePrisonerCountUI);
 
+        // TMP 기본 문구 방지: PrisonCell 현재 값으로 즉시 동기화
         RefreshPrisonerCountDisplay();
     }
 
-    /// <summary>
-    /// 첫 프레임·리셋 후 수감 UI를 PrisonCell 기준으로 갱신 (TMP 기본 문구 방지)
-    /// </summary>
     public void RefreshPrisonerCountDisplay()
     {
         if (prisonerCountText == null) return;

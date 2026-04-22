@@ -1,11 +1,7 @@
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// 달러 누적 구역 - 죄수 체포 시 달러가 쌓임
-/// 플레이어가 구역에 진입하면 1개씩 수거
-/// </summary>
-public class DollarZone : MonoBehaviour, IInteractable
+public class DollarZone : MonoBehaviour, IInteractable, IResettable
 {
     [Header("UI")]
     public TextMeshPro stackCountText;
@@ -18,7 +14,11 @@ public class DollarZone : MonoBehaviour, IInteractable
 
     public int StoredDollars { get; private set; }
 
-    /// <summary>게임 리셋 — 구역에 쌓인 달러 제거</summary>
+    private void Awake() => ResetRegistry.Register(this);
+    private void OnDestroy() => ResetRegistry.Unregister(this);
+
+    public void ResetState() => ClearStored();
+
     public void ClearStored()
     {
         StoredDollars = 0;
@@ -53,17 +53,26 @@ public class DollarZone : MonoBehaviour, IInteractable
     {
         if (dollarStackRoot == null || dollarVisualPrefab == null) return;
 
-        foreach (Transform child in dollarStackRoot)
-            Destroy(child.gameObject);
-
         int visualCount = Mathf.Min(StoredDollars, maxVisualCount);
+        int current     = dollarStackRoot.childCount;
+
+        for (int i = visualCount; i < current; i++)
+            dollarStackRoot.GetChild(i).gameObject.SetActive(false);
+
         for (int i = 0; i < visualCount; i++)
         {
-            Vector3 offset = Vector3.up * i * stackSpacing;
-            Instantiate(dollarVisualPrefab,
-                        dollarStackRoot.position + offset,
-                        dollarStackRoot.rotation,
-                        dollarStackRoot);
+            GameObject obj;
+            if (i < current)
+            {
+                obj = dollarStackRoot.GetChild(i).gameObject;
+                obj.SetActive(true);
+            }
+            else
+            {
+                obj = Instantiate(dollarVisualPrefab, dollarStackRoot);
+            }
+            obj.transform.localPosition = Vector3.up * i * stackSpacing;
+            obj.transform.localRotation = Quaternion.identity;
         }
     }
 }
