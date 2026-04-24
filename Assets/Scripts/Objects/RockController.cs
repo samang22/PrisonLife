@@ -90,7 +90,14 @@ public class RockController : MonoBehaviour, IResettable
 
         Debug.Log($"[RockController] 재생성 {gameObject.name}");
 
-        foreach (Renderer r in _renderers) r.enabled = true;
+        if (!RockFieldInstancedRenderer.IsOriginalRockRenderersSuppressed())
+        {
+            foreach (Renderer r in _renderers) r.enabled = true;
+        }
+        else
+        {
+            foreach (Renderer r in _renderers) r.enabled = false;
+        }
         RestoreColliderStates();
     }
 
@@ -100,7 +107,14 @@ public class RockController : MonoBehaviour, IResettable
     {
         _isDepleted = false;
         _respawnTimer = 0f;
-        foreach (Renderer r in _renderers) r.enabled = true;
+        if (!RockFieldInstancedRenderer.IsOriginalRockRenderersSuppressed())
+        {
+            foreach (Renderer r in _renderers) r.enabled = true;
+        }
+        else
+        {
+            foreach (Renderer r in _renderers) r.enabled = false;
+        }
         RestoreColliderStates();
     }
 

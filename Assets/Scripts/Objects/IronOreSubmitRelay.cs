@@ -1,10 +1,8 @@
 using UnityEngine;
 
-/// <summary>
 /// HandcuffMachine의 철광석 납품 구역
 /// - 플레이어가 이 구역에 진입하면 HandcuffMachine.OnInteract 호출
 /// - 납품된 철광석을 이 구역 StackRoot에 시각적으로 쌓음
-/// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class IronOreSubmitRelay : MonoBehaviour, IInteractable
 {
@@ -44,9 +42,7 @@ public class IronOreSubmitRelay : MonoBehaviour, IInteractable
         machine.OnInteract(player);
     }
 
-    /// <summary>
     /// HandcuffMachine에서 플레이어 납품 수가 바뀔 때 호출
-    /// </summary>
     public void RefreshVisual(int count)
     {
         if (stackRoot == null || ironOreVisualPrefab == null) return;

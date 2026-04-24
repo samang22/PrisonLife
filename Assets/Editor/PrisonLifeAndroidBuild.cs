@@ -5,10 +5,8 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-/// <summary>
 /// 명령줄: Unity.exe -batchmode -quit -executeMethod PrisonLifeAndroidBuild.BuildReleaseApk
 /// 출력: Builds/Android/PrisonLife.apk
-/// </summary>
 public static class PrisonLifeAndroidBuild
 {
     public static void BuildReleaseApk()

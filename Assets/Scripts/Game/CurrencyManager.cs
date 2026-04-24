@@ -46,7 +46,7 @@ public class CurrencyManager : MonoBehaviour
 
     public bool HasEnough(int amount) => CurrentDollars >= amount;
 
-    /// <summary>게임 리셋 — 전역 달러(있다면)를 시작값으로</summary>
+    /// 게임 리셋 — 전역 달러(있다면)를 시작값으로
     public void ResetToStartingAmount()
     {
         CurrentDollars = startingDollars;

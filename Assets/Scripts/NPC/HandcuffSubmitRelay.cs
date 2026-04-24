@@ -1,10 +1,8 @@
 using UnityEngine;
 
-/// <summary>
 /// PrisonerQueue의 수갑 납품 구역
 /// - 플레이어가 이 구역에 진입하면 PrisonerQueue.OnInteract 호출
 /// - 납품된 수갑을 이 구역에 시각적으로 쌓음
-/// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class HandcuffSubmitRelay : MonoBehaviour, IInteractable
 {
@@ -44,9 +42,7 @@ public class HandcuffSubmitRelay : MonoBehaviour, IInteractable
         queue.OnInteract(player);
     }
 
-    /// <summary>
     /// PrisonerQueue에서 수갑 수가 바뀔 때 호출
-    /// </summary>
     public void RefreshVisual(int count)
     {
         if (handcuffStackRoot == null || handcuffVisualPrefab == null) return;

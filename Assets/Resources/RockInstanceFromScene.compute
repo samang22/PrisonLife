@@ -1,0 +1,39 @@
+// RockController 위치(입력) → 인스턴스 행렬(출력). 가용(채굴 가능)일 때만 보이는 스케일, 소량 Y 움직임(선택)
+#pragma kernel BuildFromRocks
+
+struct RockInput
+{
+    float3 worldPos;
+    float  active; // 1 = 표시, 0 = 고갈(스케일 0)
+};
+
+StructuredBuffer<RockInput> _RockDataIn;
+RWStructuredBuffer<float4x4> _InstanceMatrices;
+uint _Count;
+float _Time;
+float _WobbleAmp;
+
+static float4x4 TRS(float3 t, float uniformScale)
+{
+    float4x4 m;
+    m[0] = float4(uniformScale, 0, 0, 0);
+    m[1] = float4(0, uniformScale, 0, 0);
+    m[2] = float4(0, 0, uniformScale, 0);
+    m[3] = float4(t, 1);
+    return m;
+}
+
+[numthreads(64, 1, 1)]
+void BuildFromRocks(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _Count)
+        return;
+
+    RockInput r = _RockDataIn[i];
+    float3 p = r.worldPos;
+    if (r.active > 0.5)
+        p.y += sin(_Time * 2.2 + (float)i * 0.13) * _WobbleAmp;
+    // 고갈 시에도 위치는 유지(콜라이더와 맞고, 셰이더에서 _InstanceActive로 discard)
+    _InstanceMatrices[i] = TRS(p, 1.0);
+}

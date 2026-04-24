@@ -87,9 +87,7 @@ public class UpgradeManager : MonoBehaviour
         return GetData(type)?.IsMaxLevel ?? true;
     }
 
-    /// <summary>
     /// UpgradeZone에서 1원씩 납부 완료 후 호출 - 달러 차감 없이 업그레이드만 적용
-    /// </summary>
     public void ApplyUpgrade(UpgradeType type)
     {
         // HireWorker: currentLevel 증가 없이 즉시 고용 처리
@@ -154,7 +152,7 @@ public class UpgradeManager : MonoBehaviour
         }
     }
 
-    /// <summary>게임 리셋 — 모든 업그레이드 단계 초기화</summary>
+    /// 게임 리셋 — 모든 업그레이드 단계 초기화
     public void ResetUpgradeProgress()
     {
         foreach (UpgradeData u in upgrades)

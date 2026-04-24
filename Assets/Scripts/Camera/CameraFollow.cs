@@ -1,8 +1,6 @@
 using UnityEngine;
 
-/// <summary>
 /// Main Camera에 부착 - 플레이어를 고정 오프셋으로 부드럽게 추적
-/// </summary>
 public class CameraFollow : MonoBehaviour
 {
     [Header("추적 대상")]

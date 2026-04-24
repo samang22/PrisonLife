@@ -22,9 +22,7 @@ public class PlayerStats : ScriptableObject
     // 단계별 실제 채굴 반경: 1·2단계는 1/3, 3단계는 full
     public float EffectiveMiningRange => drillLevel >= 2 ? miningRange : miningRange / 3f;
 
-    /// <summary>
     /// 게임 시작 시 PlayerController.Awake()에서 호출 - 기본값으로 초기화
-    /// </summary>
     public void RuntimeReset()
     {
         moveSpeed        = defaultMoveSpeed;
