@@ -39,8 +39,14 @@ public class RockFieldInstancedRenderer : MonoBehaviour
     MaterialPropertyBlock _mpb;
     static readonly int sMatrices = Shader.PropertyToID("_InstanceMatrices");
     static readonly int sActive = Shader.PropertyToID("_InstanceActive");
+    static readonly int sBaseMap = Shader.PropertyToID("_BaseMap");
+    static readonly int sBaseColor = Shader.PropertyToID("_BaseColor");
+    static readonly int sBaseMapSt = Shader.PropertyToID("_BaseMap_ST");
+    bool _copiedAlbedoFromRockMaterial;
     ComputeBuffer _activeBuf;
     int _lastCount = -1;
+    /// <summary>인스턴스 그리기용: 메쉬가 붙은 Transform(자식) — 루트 transform만 쓰면 메쉬 오프셋이 빠져 뜬 것처럼 보일 수 있음</summary>
+    Transform[] _instanceMeshRoots;
 
     /// 씬에 RockField가 있고 disableOriginalRenderers 켜짐 — RockController.Revive 등에서 머티리얼을 다시 켤지 말지 판단
     public static bool IsOriginalRockRenderersSuppressed()
@@ -52,6 +58,7 @@ public class RockFieldInstancedRenderer : MonoBehaviour
     void OnDisable()
     {
         RockFieldInstancedSrpState.ClearFrame();
+        _instanceMeshRoots = null;
         ReleaseBuffers();
     }
 
@@ -72,6 +79,8 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             RockFieldInstancedSrpState.ClearFrame();
             return;
         }
+
+        EnsureInstanceMeshRootCache(n, all);
 
         // n이 변할 때만: 첫 구동·암석 수 변화 시에 머티리얼 끄기. 리스폰(개수 동일)은 RockController 쪽이
         // IsOriginalRockRenderersSuppressed일 때 r.enabled = true 를 하지 않게 처리
@@ -101,7 +110,10 @@ public class RockFieldInstancedRenderer : MonoBehaviour
                 _matrixUpload[i] = Matrix4x4.Translate(new Vector3(0f, -1e5f, 0f));
                 continue;
             }
-            Matrix4x4 m = r.transform.localToWorldMatrix;
+            var meshRoot = (i < _instanceMeshRoots.Length && _instanceMeshRoots[i] != null)
+                ? _instanceMeshRoots[i]
+                : r.transform;
+            Matrix4x4 m = meshRoot.localToWorldMatrix;
             if (r.IsAvailable && wobbleHeight > 0f)
             {
                 Vector4 col = m.GetColumn(3);
@@ -191,6 +203,12 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         {
             _mat = new Material(instancedShader);
             _mat.enableInstancing = true;
+            _copiedAlbedoFromRockMaterial = false;
+        }
+        if (_mat != null && !_copiedAlbedoFromRockMaterial)
+        {
+            TryCopyAlbedoFromFirstRockMaterial(all);
+            _copiedAlbedoFromRockMaterial = true;
         }
 
         if (_matrices == null || _matrices.count != n)
@@ -205,6 +223,65 @@ public class RockFieldInstancedRenderer : MonoBehaviour
 
         WriteArgs(n);
         return true;
+    }
+
+    void EnsureInstanceMeshRootCache(int n, IReadOnlyList<RockController> all)
+    {
+        if (n <= 0) return;
+        if (_instanceMeshRoots != null && _instanceMeshRoots.Length == n)
+            return;
+        _instanceMeshRoots = new Transform[n];
+        for (int i = 0; i < n; i++)
+        {
+            var r = all[i];
+            if (r == null) continue;
+            _instanceMeshRoots[i] = ResolveInstanceMeshRoot(r);
+        }
+    }
+
+    /// <summary>sourceMesh(인스턴스에 쓰는 메쉬)가 붙은 Transform — 씬에 자식이 여럿이어도 동일 메쉬에 맞춤</summary>
+    Transform ResolveInstanceMeshRoot(RockController r)
+    {
+        if (sourceMesh != null)
+        {
+            var filters = r.GetComponentsInChildren<MeshFilter>(true);
+            for (int j = 0; j < filters.Length; j++)
+            {
+                var mf = filters[j];
+                if (mf != null && mf.sharedMesh == sourceMesh)
+                    return mf.transform;
+            }
+        }
+        var any = r.GetComponentInChildren<MeshFilter>(true);
+        return any != null ? any.transform : r.transform;
+    }
+
+    /// <summary>씬 Rock과 동일한 병(텍스처) 색에 맞추기: 첫 MeshRenderer의 URP/레거시 알베도 복사</summary>
+    void TryCopyAlbedoFromFirstRockMaterial(IReadOnlyList<RockController> all)
+    {
+        for (int i = 0; i < all.Count; i++)
+        {
+            if (all[i] == null) continue;
+            var mr = all[i].GetComponentInChildren<MeshRenderer>(true);
+            if (mr == null) continue;
+            var src = mr.sharedMaterial;
+            if (src == null) continue;
+            if (src.HasProperty("_BaseMap"))
+            {
+                var t = src.GetTexture("_BaseMap");
+                if (t != null) _mat.SetTexture(sBaseMap, t);
+            }
+            else if (src.HasProperty("_MainTex"))
+            {
+                var t = src.GetTexture("_MainTex");
+                if (t != null) _mat.SetTexture(sBaseMap, t);
+            }
+            if (src.HasProperty("_BaseColor")) _mat.SetColor(sBaseColor, src.GetColor("_BaseColor"));
+            else if (src.HasProperty("_Color")) _mat.SetColor(sBaseColor, src.GetColor("_Color"));
+            if (src.HasProperty("_BaseMap_ST")) _mat.SetVector(sBaseMapSt, src.GetVector("_BaseMap_ST"));
+            else if (src.HasProperty("_MainTex_ST")) _mat.SetVector(sBaseMapSt, src.GetVector("_MainTex_ST"));
+            return;
+        }
     }
 
     void WriteArgs(int n)
@@ -272,7 +349,7 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             _args,
             0,
             _mpb,
-            ShadowCastingMode.Off,
+            ShadowCastingMode.Off, // SRP: RockFieldInstancedRenderFeature의 ShadowCaster 패스가 투영(중복 방지)
             true,
             layer,
             cam,
@@ -303,6 +380,7 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             if (Application.isPlaying) Destroy(_mat);
             else DestroyImmediate(_mat);
             _mat = null;
+            _copiedAlbedoFromRockMaterial = false;
         }
     }
 }

@@ -1,6 +1,11 @@
 // RockFieldInstancedRenderer: URP 메인라이트 + 그림자 수신 / ShadowCaster(투영)
 Shader "PrisonLife/Rendering/RockFieldInstanced"
 {
+    Properties
+    {
+        [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
+        [MainColor]   _BaseColor("Color", Color) = (1, 1, 1, 1)
+    }
     SubShader
     {
         Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "Queue" = "Geometry" }
@@ -27,18 +32,27 @@ Shader "PrisonLife/Rendering/RockFieldInstanced"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _BaseMap_ST;
+            CBUFFER_END
+
             struct Attributes
             {
                 float3 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
+                float2 uv0        : TEXCOORD0;
             };
 
             struct Varyings
             {
                 float4  positionCS  : SV_POSITION;
-                float3  positionWS  : TEXCOORD0;
-                float3  normalWS    : TEXCOORD1;
-                nointerpolation float active : TEXCOORD2;
+                float2  uv          : TEXCOORD0;
+                float3  positionWS  : TEXCOORD1;
+                float3  normalWS    : TEXCOORD2;
+                nointerpolation float active : TEXCOORD3;
             };
 
             StructuredBuffer<float4x4> _InstanceMatrices;
@@ -52,6 +66,7 @@ Shader "PrisonLife/Rendering/RockFieldInstanced"
                 float3 posWS = mul(m, float4(v.positionOS, 1.0)).xyz;
                 float3x3 o2w = (float3x3)m;
                 float3 nWS = normalize(mul(o2w, v.normalOS));
+                o.uv = TRANSFORM_TEX(v.uv0, _BaseMap);
                 o.positionWS = posWS;
                 o.normalWS = nWS;
                 o.positionCS = TransformWorldToHClip(posWS);
@@ -63,7 +78,7 @@ Shader "PrisonLife/Rendering/RockFieldInstanced"
                 if (i.active < 0.5) discard;
 
                 float3 n = normalize(i.normalWS);
-                half3 albedo = half3(0.48, 0.44, 0.38);
+                half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb * _BaseColor.rgb;
                 float4 sc = TransformWorldToShadowCoord(i.positionWS);
                 Light L = GetMainLight(sc, i.positionWS, i.positionCS);
                 half Ndl = saturate(dot(n, L.direction));
@@ -88,7 +103,9 @@ Shader "PrisonLife/Rendering/RockFieldInstanced"
             #pragma fragment shadowFrag
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
+            // Shadows.hlsl(298)의 LerpWhiteTo — URP 14는 CommonMaterial.hlsl에 정의됨( Color.hlsl 아님)
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
             struct AttributesS
