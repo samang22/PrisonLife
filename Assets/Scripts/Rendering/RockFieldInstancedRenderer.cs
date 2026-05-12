@@ -2,21 +2,22 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
-/// 씬의 <see cref="RockController"/> (채광 암석) 목록 <see cref="RockController.All"/>을 기준으로
-/// 각 Rock의 <c>localToWorldMatrix</c> 를 인스턴스 행렬로 쓰고 DrawMeshInstancedIndirect 로 그립니다.
-/// 기본 Rock 메쉬/머티리얼 루트 렌더러는 선택적으로 끄고(중복 방지) 콜라이더는 그대로 둡니다.
+// RockController.All 행렬 → DrawMeshInstanced (1023 단위 배치). URP 기본 그림자. 원본 Renderer 끄는 건 선택.
 [DefaultExecutionOrder(50)]
 public class RockFieldInstancedRenderer : MonoBehaviour
 {
+    const int MaxInstancesPerBatch = 1023;
+
     [Header("RockController 씬")]
-    [Tooltip("켜면 Play 중 각 Rock의 MeshRenderer를 끕니다. GPU 경로가 실패하면 암석이 보이지 않을 수 있어 기본은 끔(원본 메쉬로도 표시).")]
+    [Tooltip("켜면 Play 중 각 Rock MeshRenderer Off. 실패하면 안 보일 수 있어 기본 끔.")]
     public bool disableOriginalRenderers = false;
 
     [Tooltip("비우면 All[0]에서 메쉬를 찾습니다.")]
     public Mesh sourceMesh;
 
-    [Tooltip("옵션. 행렬은 transform.localToWorldMatrix 로 CPU에서 채움 (스케일·회전 반영)")]
+    [Tooltip("미사용")]
     public ComputeShader rockCompute;
     [Tooltip("비우면 PrisonLife/Rendering/RockFieldInstanced")]
     public Shader instancedShader;
@@ -25,30 +26,29 @@ public class RockFieldInstancedRenderer : MonoBehaviour
     [Min(0f)] public float wobbleHeight = 0.08f;
 
     [Header("렌더 대상")]
-    [Tooltip("비우면 SRP 인스턴스 경로는 \"지금 그리는\" URP Base 카메라마다 제출. FindObjectOfType으로 잡으면 실제 게임 카메라와 달라 전부 스킵될 수 있어 비우는 경우가 안전함.")]
+    [Tooltip("비우면 URP Base 카메라마다.")]
     public Camera targetCamera;
 
-    [Tooltip("켜면 SRP(URP)와 별도로 Graphics.DrawMeshInstancedIndirect 도 호출합니다. 디버그·비상용(이중 그리기·비용). 기본 끔 = SRP Pass만(에디터에서 URP에 RockFieldInstancedRenderFeature 자동 등록).")]
-    public bool alsoDrawWithGraphics;
+    [Header("디버그(읽기 전용)")]
+    [Tooltip("Play 중 마지막 프레임 All.Count")]
+    [SerializeField] int _debugLastRegisteredRockCount;
 
     Matrix4x4[] _matrixUpload;
-    ComputeBuffer _matrices;
-    GraphicsBuffer _args;
-    uint _argsInstanceCount;
+    Matrix4x4[] _batchMatrices;
     Material _mat;
-    MaterialPropertyBlock _mpb;
-    static readonly int sMatrices = Shader.PropertyToID("_InstanceMatrices");
     static readonly int sActive = Shader.PropertyToID("_InstanceActive");
+    static readonly int sBatchInstanceOffset = Shader.PropertyToID("_BatchInstanceOffset");
     static readonly int sBaseMap = Shader.PropertyToID("_BaseMap");
     static readonly int sBaseColor = Shader.PropertyToID("_BaseColor");
     static readonly int sBaseMapSt = Shader.PropertyToID("_BaseMap_ST");
     bool _copiedAlbedoFromRockMaterial;
     ComputeBuffer _activeBuf;
     int _lastCount = -1;
-    /// <summary>인스턴스 그리기용: 메쉬가 붙은 Transform(자식) — 루트 transform만 쓰면 메쉬 오프셋이 빠져 뜬 것처럼 보일 수 있음</summary>
+    int _readyCount;
+    // 메쉬 필터 트랜스폼 캐시 (루트만 쓰면 어색할 때 대비)
     Transform[] _instanceMeshRoots;
 
-    /// 씬에 RockField가 있고 disableOriginalRenderers 켜짐 — RockController.Revive 등에서 머티리얼을 다시 켤지 말지 판단
+    // disableOriginalRenderers일 때 원본 렌더 켤지 결정 등에 참고
     public static bool IsOriginalRockRenderersSuppressed()
     {
         var rf = UnityEngine.Object.FindObjectOfType<RockFieldInstancedRenderer>();
@@ -57,9 +57,87 @@ public class RockFieldInstancedRenderer : MonoBehaviour
 
     void OnDisable()
     {
-        RockFieldInstancedSrpState.ClearFrame();
         _instanceMeshRoots = null;
         ReleaseBuffers();
+    }
+
+    // 버퍼/오프셋은 Material (MPB 버퍼가 안 묶이던 테스트 있음)
+    void SubmitDrawMeshInstanced(IReadOnlyList<RockController> all)
+    {
+        if (_readyCount <= 0 || _mat == null || sourceMesh == null || _activeBuf == null)
+            return;
+        if (_matrixUpload == null || _matrixUpload.Length < _readyCount)
+            return;
+        if (all == null)
+            return;
+
+        if (_batchMatrices == null || _batchMatrices.Length != MaxInstancesPerBatch)
+            _batchMatrices = new Matrix4x4[MaxInstancesPerBatch];
+
+        int n = _readyCount;
+        int drawLayer = CullingLayerForRocks(n, all);
+        _mat.SetBuffer(sActive, _activeBuf);
+
+        foreach (var camera in EnumerateDrawCameras())
+        {
+            if (camera == null || !camera.isActiveAndEnabled)
+                continue;
+            for (int start = 0; start < n; start += MaxInstancesPerBatch)
+            {
+                int batch = Mathf.Min(MaxInstancesPerBatch, n - start);
+                Array.Copy(_matrixUpload, start, _batchMatrices, 0, batch);
+                _mat.SetInt(sBatchInstanceOffset, start);
+                // 12인자 오버로드만 존재
+                Graphics.DrawMeshInstanced(
+                    sourceMesh,
+                    0,
+                    _mat,
+                    _batchMatrices,
+                    batch,
+                    null,
+                    ShadowCastingMode.On,
+                    true,
+                    drawLayer,
+                    camera,
+                    LightProbeUsage.Off,
+                    null);
+            }
+        }
+    }
+
+    IEnumerable<Camera> EnumerateDrawCameras()
+    {
+        if (targetCamera != null)
+        {
+            yield return targetCamera;
+            yield break;
+        }
+        bool any = false;
+#if UNITY_2023_1_OR_NEWER
+        var list = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+#else
+        var list = UnityEngine.Object.FindObjectsOfType<Camera>();
+#endif
+        if (list != null)
+        {
+            for (int i = 0; i < list.Length; i++)
+            {
+                var c = list[i];
+                if (c == null || !c.isActiveAndEnabled)
+                    continue;
+                if (c.cameraType == CameraType.Preview)
+                    continue;
+                var urp = c.GetUniversalAdditionalCameraData();
+                if (urp == null || urp.renderType != CameraRenderType.Base)
+                    continue;
+                any = true;
+                yield return c;
+            }
+        }
+        if (any)
+            yield break;
+        if (Camera.main != null && Camera.main.isActiveAndEnabled)
+            yield return Camera.main;
     }
 
     void LateUpdate()
@@ -70,20 +148,20 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         int n = all.Count;
         if (n == 0)
         {
-            RockFieldInstancedSrpState.ClearFrame();
+            _readyCount = 0;
+            _debugLastRegisteredRockCount = 0;
             return;
         }
 
         if (!EnsureInit(n, all))
         {
-            RockFieldInstancedSrpState.ClearFrame();
+            _readyCount = 0;
+            _debugLastRegisteredRockCount = 0;
             return;
         }
 
         EnsureInstanceMeshRootCache(n, all);
 
-        // n이 변할 때만: 첫 구동·암석 수 변화 시에 머티리얼 끄기. 리스폰(개수 동일)은 RockController 쪽이
-        // IsOriginalRockRenderersSuppressed일 때 r.enabled = true 를 하지 않게 처리
         if (disableOriginalRenderers && _lastCount != n)
         {
             ApplyRenderersOff(all, true);
@@ -106,7 +184,6 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             var r = all[i];
             if (r == null)
             {
-                // float4x4.zero 는 셰이더侧 inverse(3x3) 에서 NaN — 폐기·인스턴스이지만 vert는 돈다
                 _matrixUpload[i] = Matrix4x4.Translate(new Vector3(0f, -1e5f, 0f));
                 continue;
             }
@@ -122,25 +199,10 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             }
             _matrixUpload[i] = m;
         }
-        _matrices.SetData(_matrixUpload);
 
-        BindInstanceBuffersToMpb();
-        var drawBounds = CullingBoundsForRocks(n, all);
-        int drawLayer = CullingLayerForRocks(n, all);
-
-        // SRP: drawCamera에 GetAnyCamera()를 넣으면 씬의 "첫" Camera가 URP Base와 다를 때
-        // RockFieldInstancedRenderFeature가 매 프레임 스킵되어 시작부터 암석이 안 그려짐.
-        // targetCamera 미지정 시 null -> Pass는 현재 URP Base 렌더와 카메라 일치 필터를 쓰지 않음.
-        Camera drawCamForSrp = targetCamera;
-        Camera drawCamGraphics = targetCamera != null ? targetCamera : GetAnyCamera();
-        if (drawCamGraphics == null && alsoDrawWithGraphics)
-            Debug.LogWarning("RockFieldInstancedRenderer: 카메라 없음 — Graphics.DrawMeshInstancedIndirect 가 스킵될 수 있음.");
-
-        RockFieldInstancedSrpState.PrepareDraw(
-            sourceMesh, 0, _mat, _mpb, _args, 0, drawBounds, drawCamForSrp);
-
-        if (alsoDrawWithGraphics)
-            DrawMeshInstancedGraphics(drawBounds, drawLayer, drawCamGraphics);
+        _readyCount = n;
+        _debugLastRegisteredRockCount = n;
+        SubmitDrawMeshInstanced(all);
     }
 
     void OnDestroy()
@@ -211,17 +273,6 @@ public class RockFieldInstancedRenderer : MonoBehaviour
             _copiedAlbedoFromRockMaterial = true;
         }
 
-        if (_matrices == null || _matrices.count != n)
-        {
-            if (_matrices != null) _matrices.Dispose();
-            _matrices = new ComputeBuffer(n, sizeof(float) * 16, ComputeBufferType.Structured);
-        }
-        if (_args == null)
-            _args = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, sizeof(uint) * 5);
-
-        _mpb ??= new MaterialPropertyBlock();
-
-        WriteArgs(n);
         return true;
     }
 
@@ -239,7 +290,6 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         }
     }
 
-    /// <summary>sourceMesh(인스턴스에 쓰는 메쉬)가 붙은 Transform — 씬에 자식이 여럿이어도 동일 메쉬에 맞춤</summary>
     Transform ResolveInstanceMeshRoot(RockController r)
     {
         if (sourceMesh != null)
@@ -256,7 +306,6 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         return any != null ? any.transform : r.transform;
     }
 
-    /// <summary>씬 Rock과 동일한 병(텍스처) 색에 맞추기: 첫 MeshRenderer의 URP/레거시 알베도 복사</summary>
     void TryCopyAlbedoFromFirstRockMaterial(IReadOnlyList<RockController> all)
     {
         for (int i = 0; i < all.Count; i++)
@@ -284,49 +333,6 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         }
     }
 
-    void WriteArgs(int n)
-    {
-        uint c = (uint)n;
-        if (_argsInstanceCount == c)
-            return;
-        // D3D/플랫폼별 struct 패딩 이슈를 피하기 위해 Unity 문서에 나온 5*uint (indexed indirect) 사용
-        var a = new uint[5];
-        a[0] = sourceMesh.GetIndexCount(0);
-        a[1] = c;
-        a[2] = (uint)sourceMesh.GetIndexStart(0);
-        a[3] = (uint)sourceMesh.GetBaseVertex(0);
-        a[4] = 0;
-        _args.SetData(a);
-        _argsInstanceCount = c;
-    }
-
-    static Bounds CullingBoundsForRocks(int n, IReadOnlyList<RockController> all)
-    {
-        if (n <= 0)
-            return new Bounds(Vector3.zero, Vector3.one * 4f);
-        int first = 0;
-        while (first < n && all[first] == null) first++;
-        if (first >= n) return new Bounds(Vector3.zero, Vector3.one * 4f);
-        var b = new Bounds(all[first].transform.position, Vector3.zero);
-        for (int i = first + 1; i < n; i++)
-        {
-            if (all[i] == null) continue;
-            b.Encapsulate(all[i].transform.position);
-            var s = all[i].transform.lossyScale;
-            float ext = Mathf.Max(s.x, Mathf.Max(s.y, s.z)) * 0.5f;
-            b.Encapsulate(new Bounds(all[i].transform.position, Vector3.one * ext * 2f));
-        }
-        b.Expand(2f);
-        return b;
-    }
-
-    void BindInstanceBuffersToMpb()
-    {
-        if (_matrices == null || _activeBuf == null) return;
-        _mpb.SetBuffer(sMatrices, _matrices);
-        _mpb.SetBuffer(sActive, _activeBuf);
-    }
-
     static int CullingLayerForRocks(int n, IReadOnlyList<RockController> all)
     {
         for (int i = 0; i < n; i++)
@@ -337,44 +343,9 @@ public class RockFieldInstancedRenderer : MonoBehaviour
         return 0;
     }
 
-    void DrawMeshInstancedGraphics(Bounds bounds, int layer, Camera cam)
-    {
-        if (_matrices == null || _args == null || _activeBuf == null)
-            return;
-        Graphics.DrawMeshInstancedIndirect(
-            sourceMesh,
-            0,
-            _mat,
-            bounds,
-            _args,
-            0,
-            _mpb,
-            ShadowCastingMode.Off, // SRP: RockFieldInstancedRenderFeature의 ShadowCaster 패스가 투영(중복 방지)
-            true,
-            layer,
-            cam,
-            LightProbeUsage.Off,
-            null);
-    }
-
-    static Camera GetAnyCamera()
-    {
-        if (Camera.main != null)
-            return Camera.main;
-#if UNITY_2023_1_OR_NEWER
-        var list = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
-        return list is { Length: > 0 } ? list[0] : null;
-#else
-        return UnityEngine.Object.FindObjectOfType<Camera>();
-#endif
-    }
-
     void ReleaseBuffers()
     {
         if (_activeBuf != null) { _activeBuf.Dispose(); _activeBuf = null; }
-        if (_matrices != null) { _matrices.Dispose(); _matrices = null; }
-        if (_args != null) { _args.Dispose(); _args = null; }
-        _argsInstanceCount = 0;
         if (_mat != null)
         {
             if (Application.isPlaying) Destroy(_mat);

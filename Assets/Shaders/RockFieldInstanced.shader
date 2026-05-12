@@ -1,151 +1,185 @@
-// RockFieldInstancedRenderer: URP 메인라이트 + 그림자 수신 / ShadowCaster(투영)
 Shader "PrisonLife/Rendering/RockFieldInstanced"
 {
     Properties
     {
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
-        [MainColor]   _BaseColor("Color", Color) = (1, 1, 1, 1)
+        [MainColor]   _BaseColor("Color", Color) = (1,1,1,1)
+        [HideInInspector] _BatchInstanceOffset("Batch Base", Int) = 0
     }
     SubShader
     {
-        Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "Queue" = "Geometry" }
-        // Forward + 그림자 수신
+        Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" "Queue"="Geometry" }
+
+        // Forward
         Pass
         {
             Name "ForwardLit"
-            Tags { "LightMode" = "UniversalForward" }
-            ZWrite On
-            ZTest LEqual
-            Cull Back
+            Tags { "LightMode"="UniversalForward" }
+            ZWrite On ZTest LEqual Cull Back
+
             HLSLPROGRAM
-            #pragma target 3.0
+            #pragma target 3.5
             #pragma vertex   vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fragment _ _RECEIVE_SHADOWS_OFF
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            TEXTURE2D(_BaseMap);
-            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float4 _BaseMap_ST;
+                int    _BatchInstanceOffset;
             CBUFFER_END
+
+            StructuredBuffer<float> _InstanceActive;
 
             struct Attributes
             {
-                float3 positionOS : POSITION;
+                float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
                 float2 uv0        : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
             {
-                float4  positionCS  : SV_POSITION;
-                float2  uv          : TEXCOORD0;
-                float3  positionWS  : TEXCOORD1;
-                float3  normalWS    : TEXCOORD2;
-                nointerpolation float active : TEXCOORD3;
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
+                float3 normalWS   : TEXCOORD2;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            StructuredBuffer<float4x4> _InstanceMatrices;
-            StructuredBuffer<float>  _InstanceActive;
-
-            Varyings vert(Attributes v, uint iid : SV_InstanceID)
+            Varyings vert(Attributes v)
             {
+                UNITY_SETUP_INSTANCE_ID(v);
                 Varyings o;
-                o.active = _InstanceActive[iid];
-                float4x4 m = _InstanceMatrices[iid];
-                float3 posWS = mul(m, float4(v.positionOS, 1.0)).xyz;
-                float3x3 o2w = (float3x3)m;
-                float3 nWS = normalize(mul(o2w, v.normalOS));
-                o.uv = TRANSFORM_TEX(v.uv0, _BaseMap);
-                o.positionWS = posWS;
-                o.normalWS = nWS;
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+                #ifdef UNITY_INSTANCING_ENABLED
+                    uint gid = (uint)_BatchInstanceOffset + (uint)unity_InstanceID;
+                #else
+                    uint gid = (uint)_BatchInstanceOffset;
+                #endif
+
+                float active = _InstanceActive[gid];
+                float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
+                if (active < 0.5)
+                    posWS = float3(0, -1e9, 0);
+
                 o.positionCS = TransformWorldToHClip(posWS);
+                o.positionWS = posWS;
+                o.normalWS   = TransformObjectToWorldNormal(v.normalOS);
+                o.uv         = TRANSFORM_TEX(v.uv0, _BaseMap);
                 return o;
             }
 
             half4 frag(Varyings i) : SV_Target
             {
-                if (i.active < 0.5) discard;
-
                 float3 n = normalize(i.normalWS);
-                half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb * _BaseColor.rgb;
+                half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb
+                             * _BaseColor.rgb;
                 float4 sc = TransformWorldToShadowCoord(i.positionWS);
                 Light L = GetMainLight(sc, i.positionWS, i.positionCS);
-                half Ndl = saturate(dot(n, L.direction));
-                half3 direct = albedo * L.color * (Ndl * L.shadowAttenuation) * L.distanceAttenuation;
-                half3 amb = albedo * half3(0.15, 0.16, 0.18);
+                half  NdL    = saturate(dot(n, L.direction));
+                half3 direct = albedo * L.color * NdL * L.shadowAttenuation * L.distanceAttenuation;
+                half3 amb    = albedo * half3(0.15h, 0.16h, 0.18h);
                 return half4(direct + amb, 1.0h);
             }
             ENDHLSL
         }
-        // 그림자 맵(투영) — URP는 ShadowCaster + ApplyShadowBias
+
+        // Shadow
         Pass
         {
             Name "ShadowCaster"
-            Tags { "LightMode" = "ShadowCaster" }
-            ZWrite On
-            ZTest LEqual
-            ColorMask 0
-            Cull Back
+            Tags { "LightMode"="ShadowCaster" }
+            ZWrite On ZTest LEqual ColorMask 0 Cull Back
+
             HLSLPROGRAM
-            #pragma target 3.0
+            #pragma target 3.5
             #pragma vertex   shadowVert
             #pragma fragment shadowFrag
+            #pragma multi_compile_instancing
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
-            // Shadows.hlsl(298)의 LerpWhiteTo — URP 14는 CommonMaterial.hlsl에 정의됨( Color.hlsl 아님)
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseColor;
+                float4 _BaseMap_ST;
+                int    _BatchInstanceOffset;
+            CBUFFER_END
+
+            StructuredBuffer<float> _InstanceActive;
+
             struct AttributesS
             {
-                float3 positionOS : POSITION;
+                float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct VaryingsS
             {
                 float4 positionCS : SV_POSITION;
-                nointerpolation float active : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            StructuredBuffer<float4x4> _InstanceMatrices;
-            StructuredBuffer<float>  _InstanceActive;
-
-            VaryingsS shadowVert(AttributesS v, uint iid : SV_InstanceID)
+            VaryingsS shadowVert(AttributesS v)
             {
+                UNITY_SETUP_INSTANCE_ID(v);
                 VaryingsS o;
-                o.active = _InstanceActive[iid];
-                float4x4 m = _InstanceMatrices[iid];
-                float3 posWS = mul(m, float4(v.positionOS, 1.0)).xyz;
-                float3x3 o2w = (float3x3)m;
-                float3 nWS = normalize(mul(o2w, v.normalOS));
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+                #ifdef UNITY_INSTANCING_ENABLED
+                    uint gid = (uint)_BatchInstanceOffset + (uint)unity_InstanceID;
+                #else
+                    uint gid = (uint)_BatchInstanceOffset;
+                #endif
+
+                float active = _InstanceActive[gid];
+
+                float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
+                float3 nWS   = TransformObjectToWorldNormal(v.normalOS);
+
+                if (active < 0.5)
+                {
+                    o.positionCS = float4(0, 0, -2, 1);
+                    return o;
+                }
+
             #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                 float3 ldir = normalize(_LightPosition - posWS);
             #else
-                float3 ldir = _LightDirection; // URP: 방향광/스팟 셰도우 패스에 설정됨(ShadowUtils)
+                float3 ldir = normalize(_LightDirection);
             #endif
+
                 float4 pCS = TransformWorldToHClip(ApplyShadowBias(posWS, nWS, ldir));
-                o.positionCS = ApplyShadowClamping(pCS);
+            #if UNITY_REVERSED_Z
+                pCS.z = min(pCS.z, pCS.w * UNITY_NEAR_CLIP_VALUE);
+            #else
+                pCS.z = max(pCS.z, pCS.w * UNITY_NEAR_CLIP_VALUE);
+            #endif
+                o.positionCS = pCS;
                 return o;
             }
 
-            half4 shadowFrag(VaryingsS i) : SV_Target
-            {
-                if (i.active < 0.5) clip(-1);
-                return 0;
-            }
+            half4 shadowFrag(VaryingsS i) : SV_Target { return 0; }
             ENDHLSL
         }
     }
